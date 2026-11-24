@@ -13,8 +13,10 @@ import java.util.Locale
 /**
  * What the model is told, and what it's allowed to ask for.
  *
- * Every word here is read by the phone's CPU before each answer can start, so it's kept
- * short and, above all, identical from one request to the next: [LocalModel] reads it once and
+ * The model is a general assistant first (questions, recipes, explanations) and a phone
+ * controller second; small models otherwise decide everything is a phone request. Every word
+ * here is read by the phone's CPU before each answer can start, so it's kept short and, above
+ * all, identical from one request to the next: [LocalModel] reads it once and
  * reuses it. That's why the system message carries only the date (it changes once a day), not
  * the time ("what time is it?" is answered by a tool anyway).
  *
@@ -67,10 +69,13 @@ object ModelPrompts {
 
     fun system(today: LocalDate = LocalDate.now()): String {
         val date = today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH))
-        return "You are Shuttle, the assistant on this Android phone. You run entirely on the phone. " +
-            "Answer in one to three short sentences unless asked for more. " +
-            "Use a function when the user wants something done on the phone, and never claim an action happened unless you called one. " +
-            "You can't access the internet, so you can't look up news, weather, prices, scores or other current facts; say so briefly instead of guessing. " +
+        return "You are Shuttle, a helpful general assistant running on the user's Android phone. " +
+            "Answer any question from your own knowledge: facts, explanations, how-tos, recipes, advice, writing and maths. " +
+            "Be concise, and use a short list for steps or ingredients. " +
+            "You can also control the phone with the functions below; call one only when the user wants something done on the phone, " +
+            "and never claim an action happened unless you called a function for it. " +
+            "You can't browse the internet and your knowledge has a cutoff, so for things that change " +
+            "(who holds an office, news, prices, weather, scores) give what you know and say it may be out of date. " +
             "Today is $date."
     }
 

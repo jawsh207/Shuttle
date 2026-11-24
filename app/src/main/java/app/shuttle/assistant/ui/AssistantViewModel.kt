@@ -155,6 +155,7 @@ class AssistantViewModel : ViewModel() {
     }
 
     private var stopped = false
+    private val STOPPED = "Stopped."
 
     /** Stops the model mid-reply, even while it's still reading; what it wrote so far stays. */
     fun stopThinking() {
@@ -203,7 +204,7 @@ class AssistantViewModel : ViewModel() {
                     val calls = GranitePrompt.toolCalls(event.raw).mapNotNull(ModelPrompts::sanitize)
                     if (calls.isEmpty()) {
                         replace(placeholder.id) {
-                            it.copy(result = ToolResult.Done(text.ifBlank { if (stopped) "Stopped." else "I don't have an answer for that." }), thinking = false)
+                            it.copy(result = ToolResult.Done(text.ifBlank { if (stopped) STOPPED else "I don't have an answer for that." }), thinking = false)
                         }
                         persist()
                         return@generate after(false)
@@ -235,7 +236,9 @@ class AssistantViewModel : ViewModel() {
         val messages = ArrayDeque<GranitePrompt.Message>()
         var budget = 6000
         for (e in exchanges.asReversed()) {
-            val answer = e.result.text.trim()
+            // Only real answers are context. Shuttle's own notes (errors, "Stopped.", "the model
+            // isn't downloaded") would just be copied into the next reply.
+            val answer = if (e.result is ToolResult.Failed || e.thinking || e.result.text == STOPPED) "" else e.result.text.trim()
             if (answer.isNotEmpty()) {
                 val prev = messages.firstOrNull()
                 // Several results for one request read as one answer.

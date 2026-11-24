@@ -70,7 +70,7 @@ object LocalModel {
     fun generate(
         file: File,
         prompt: String,
-        maxTokens: Int = 320,
+        maxTokens: Int = 512,
         temperature: Float = 0.3f,
         shouldStop: (String) -> Boolean = { false },
         onEvent: (Event) -> Unit,

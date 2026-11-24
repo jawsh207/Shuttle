@@ -55,5 +55,7 @@ class GranitePromptTest {
         assertEquals("Working", GranitePrompt.visibleText("Working <tool_c"))
         assertEquals("a < b", GranitePrompt.visibleText("a < b"))
         assertEquals("", GranitePrompt.visibleText("<think>still thinking"))
+        assertEquals("Rayleigh scattering.", GranitePrompt.visibleText("Stopped.\n</think> Rayleigh scattering."))
+        assertEquals("Answer", GranitePrompt.visibleText("</think>\n\nAnswer"))
     }
 }

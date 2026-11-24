@@ -121,9 +121,12 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   model and offers it in Settings; a copy of the current choice is built in (`llm/ModelSpec.kt`).
 - **Talking to it.** `llm/GranitePrompt.kt` writes the conversation in Granite's own format
   (from its published chat template, with thinking off so answers start straight away) and
-  reads tool calls out of the reply. `llm/ModelPrompts.kt` holds the instructions it's given:
-  short answers, use the phone's tools for actions, and say it can't go online rather than
-  guess. To keep that start short and unchanging, it holds only the date (not the time), and
+  reads tool calls out of the reply, hiding any stray thinking markers. `llm/ModelPrompts.kt`
+  holds the instructions it's given: a general assistant first (questions, explanations,
+  recipes, advice), concise, using the phone's tools only when asked to do something on the
+  phone, and saying its knowledge may be out of date for things that change, since it can't
+  go online. Earlier turns of the chat go along as context, but only real answers: Shuttle's
+  own notes (errors, "Stopped.") are left out so the model doesn't repeat them. To keep that start short and unchanging, it holds only the date (not the time), and
   the model sees a compact tool list: the twelve on/off switches are one "set switch" tool and
   every "is it on?" question is one "check setting" tool, which are turned back into the real
   tools before anything runs.

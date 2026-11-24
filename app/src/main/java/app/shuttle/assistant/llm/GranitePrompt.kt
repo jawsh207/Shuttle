@@ -88,11 +88,15 @@ object GranitePrompt {
     }.toList()
 
     /**
-     * What to show the user from a (possibly still streaming) reply: no thinking block, and
-     * nothing from the first tool call on, including a half-written `<tool_call` tag.
+     * What to show the user from a (possibly still streaming) reply: no thinking block (or a
+     * stray `</think>`), and nothing from the first tool call on, including a half-written
+     * `<tool_call` tag.
      */
     fun visibleText(reply: String): String {
         var s = reply.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
+        // The prompt already opened and closed the thinking block, but the model sometimes
+        // closes it again: keep only what comes after the last stray "</think>".
+        if (s.contains("</think>")) s = s.substringAfterLast("</think>")
         s = s.substringBefore("<think>")
         val call = s.indexOf("<tool_call")
         if (call >= 0) s = s.substring(0, call)

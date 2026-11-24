@@ -92,7 +92,8 @@ limit, and nothing you ask leaves the phone.
   any point.
 - **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
   after ten quiet minutes.
-- **No internet yet:** the model can't look things up, and it says so rather than guessing (see
+- **No internet yet:** the model answers from what it learned in training, so for things that
+  change (who holds an office, news, prices) it says its answer may be out of date (see
   [Roadmap](#roadmap)).
 
 ## Voice
