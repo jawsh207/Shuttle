@@ -45,5 +45,6 @@ schemas are plain Kotlin, so add tests for any change there.
 
 ## Builds and releases
 
-Every push to `main` builds a signed, optimized test APK on GitHub Actions. Releases: push
+Every push to `main` builds a signed, optimized test APK on GitHub Actions (or, until the release
+key is set, a debug APK signed with the throwaway key in `app/debug.keystore`). Releases: push
 `release-notes/vX.Y.Z.md`, or run **Actions › Build release**. See the README for details.

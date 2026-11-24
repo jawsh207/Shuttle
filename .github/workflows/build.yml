@@ -159,19 +159,42 @@ jobs:
               print(f"::error title=Build errors {n}/{len(chunks)}::{msg}")
           PYEOF
 
-      - name: Require signing key
+      # No release key set yet: build a debug APK signed with the throwaway test key committed
+      # at app/debug.keystore, so every push still gives something to install and test. It
+      # installs alongside release builds (its package name ends in .debug).
+      - name: Build debug APK (no release key)
         if: env.HAS_SIGNING != 'true'
+        shell: bash
         run: |
-          echo "::error title=Signing key missing::Add the SHUTTLE_KEYSTORE_BASE64, SHUTTLE_KEYSTORE_PASSWORD, SHUTTLE_KEY_ALIAS and SHUTTLE_KEY_PASSWORD repository secrets (see README › Signing). The code compiled, but no APK is published without them."
+          set -o pipefail
+          ./gradlew --stacktrace assembleDebug 2>&1 | tee -a build.log
+          mkdir -p out-debug
+          cp app/build/outputs/apk/debug/app-debug.apk "out-debug/Shuttle-debug-${SHUTTLE_VERSION_NAME}.apk"
+          ls -la out-debug
+          echo "::warning title=Debug build only::No release signing key is set, so this run published a debug APK signed with the throwaway test key. Add the SHUTTLE_KEYSTORE_* secrets (README › Signing) for release builds."
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_SIGNING != 'true'
+        with:
+          name: Shuttle-debug-${{ env.SHUTTLE_VERSION_NAME }}
+          path: out-debug/*.apk
+
+      # Releases are never published with the test key.
+      - name: Require signing key for releases
+        if: env.HAS_SIGNING != 'true' && env.RELEASE_TAG != ''
+        run: |
+          echo "::error title=Signing key missing::Releases need the SHUTTLE_KEYSTORE_BASE64, SHUTTLE_KEYSTORE_PASSWORD, SHUTTLE_KEY_ALIAS and SHUTTLE_KEY_PASSWORD repository secrets (see README › Signing)."
           exit 1
 
       - name: Collect APK
+        if: env.HAS_SIGNING == 'true'
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/app-release.apk "out/Shuttle-${SHUTTLE_VERSION_NAME}.apk"
           ls -la out
 
       - uses: actions/upload-artifact@v4
+        if: env.HAS_SIGNING == 'true'
         with:
           name: Shuttle-${{ env.SHUTTLE_VERSION_NAME }}
           path: out/*.apk

@@ -102,6 +102,11 @@ Every push to `main` produces an optimized release APK (R8-shrunk, non-debuggabl
 Shuttle's release key; download it from the run's **Artifacts** under **Actions → Build**.
 Each build has a higher version code, so it installs as an update over the last one.
 
+Until the release signing secrets are set (see [Signing](#signing)), each run instead publishes
+**Shuttle-debug-…**, a debug APK signed with a throwaway test key that's kept in the repository
+(`app/debug.keystore`). It installs next to release builds as *Shuttle Debug*, and each debug
+build updates the last one. It's for testing only: the key is public, and releases never use it.
+
 To build locally: `./gradlew assembleRelease` (or `assembleDebug`). Unit tests:
 `./gradlew testDebugUnitTest`. Requires JDK 17 and an Android SDK with compileSdk 37.
 

@@ -70,7 +70,7 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
-            android:taskAffinity="app.shuttle.assistant.assist"
+            android:taskAffinity="${applicationId}.assist"
             android:theme="@style/Theme.Shuttle.Assist"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

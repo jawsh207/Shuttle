@@ -17,6 +17,18 @@ android {
         versionName = System.getenv("SHUTTLE_VERSION_NAME") ?: "0.1.0"
     }
 
+    // Debug builds use a throwaway test key kept in the repo (app/debug.keystore, the standard
+    // debug passwords), so every CI debug build installs as an update over the last one. It is
+    // only for testing: releases are never signed with it.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     // Release signing comes from the environment (GitHub secrets in CI). Every build CI ships
     // is an optimized release build signed with this key, so each one installs as an update.
     val keystorePath = System.getenv("SHUTTLE_KEYSTORE_FILE")
@@ -32,6 +44,12 @@ android {
     }
 
     buildTypes {
+        // Installs next to a release build, as "Shuttle Debug" (src/debug/res).
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             // R8: shrink, optimize and obfuscate; drop unused resources.
             isMinifyEnabled = true
