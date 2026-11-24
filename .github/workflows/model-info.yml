@@ -1,0 +1,28 @@
+name: Model info
+on:
+  push:
+    branches: [model-info]
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch model metadata
+        run: |
+          B=https://huggingface.co/ibm-granite
+          echo "=== HEAD Q4_K_M"
+          curl -sIL "$B/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_K_M.gguf" | grep -i -E "x-linked-etag|x-linked-size|content-length|location|etag" || true
+          echo "=== chat_template.jinja"
+          curl -sfL "$B/granite-4.2-3b/resolve/main/chat_template.jinja" || echo "(none)"
+          echo "=== tokenizer_config.json chat_template"
+          curl -sfL "$B/granite-4.2-3b/resolve/main/tokenizer_config.json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('chat_template','(none)')); print('eos', d.get('eos_token'), 'bos', d.get('bos_token'))" || true
+          echo "=== generation_config.json"
+          curl -sfL "$B/granite-4.2-3b/resolve/main/generation_config.json" || true
+          echo "=== GGUF README"
+          curl -sfL "$B/granite-4.2-3b-GGUF/resolve/main/README.md" || true
+      - name: Download and hash Q4_K_M
+        run: |
+          curl -sfL -o m.gguf "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_K_M.gguf"
+          ls -l m.gguf
+          sha256sum m.gguf
+      - name: Latest llama.cpp release
+        run: curl -s https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['tag_name'], d['published_at'])"
