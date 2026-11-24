@@ -156,6 +156,40 @@ object CommandParser {
         }
     }
 
+    /**
+     * What people call each switchable feature. Shared by the switch rules and the status
+     * rules, so "kill the wifi" and "is the wifi on?" always agree on what "wifi" means.
+     * Hotspot comes first so "wifi hotspot" is the hotspot.
+     */
+    private val ALIASES: Map<String, String> = linkedMapOf(
+        "hotspot" to "hotspot|wifi hotspot|mobile hotspot|personal hotspot|tethering",
+        "flashlight" to "flashlight|torch|flash|light|lights|torch light",
+        "wifi" to "wifi|wireless|wlan|wifi connection",
+        "bluetooth" to "bluetooth|bt",
+        "mobile_data" to "mobile data|cellular data|cell data|cellular|data|mobile network|internet|mobile internet",
+        "nfc" to "nfc|tap to pay|contactless",
+        "airplane_mode" to "airplane|aeroplane|flight|plane",
+        "location" to "location|location services|gps|location tracking",
+        "dark_mode" to "dark|dark theme|night|dark display",
+        "do_not_disturb" to "do not disturb|dnd|focus|quiet|quiet hours|focus time",
+        "auto_rotate" to "auto-rotate|auto[- ]?rotation|screen rotation|rotation|rotate|screen rotate",
+        "auto_brightness" to "auto[- ]?brightness|adaptive brightness|automatic brightness",
+    )
+
+    private fun status(setting: String) = ToolCall("status", mapOf("setting" to setting))
+
+    /** "is wifi on?", "do I have bluetooth on?", "check location", "am I on wifi?" */
+    private fun statusRules(): List<Rule> = buildList {
+        for ((tool, aliases) in ALIASES) {
+            val a = "$ART(?:$aliases)(?:\\s+mode)?"
+            val state = "(?:\\s+(?:on|off|enabled|disabled|active|turned on|turned off|switched on|switched off|working|still on|on right now|on now))?"
+            add(Rule("(?:is|are)\\s+$a$state") { status(tool) })
+            add(Rule("(?:do|have)\\s+i\\s+(?:got\\s+|have\\s+)?$a\\s+(?:on|turned on|enabled|switched on)") { status(tool) })
+            add(Rule("(?:check|what's|whats|what is)\\s+(?:the\\s+)?(?:status of\\s+)?$a(?:\\s+status)?|$a\\s+status") { status(tool) })
+            add(Rule("am\\s+i\\s+(?:on|using|in|connected to)\\s+$a") { status(tool) })
+        }
+    }
+
     private fun media(action: String) = ToolCall("media", mapOf("action" to action))
     private fun volume(action: String, percent: String? = null) =
         ToolCall("volume", buildMap { put("action", action); percent?.let { put("percent", it) } })
@@ -215,19 +249,27 @@ object CommandParser {
     // --- Rules ----------------------------------------------------------------------------
 
     private val rules: List<Rule> = buildList {
+        // Questions about a setting, before the switch rules that change it.
+        addAll(statusRules())
+        val ringerNow = "(?:(?:my|the)\\s+)?(?:phone|ringer|ringtone|sound|it)"
+        add(Rule("am\\s+i\\s+(?:on\\s+)?(?:silent|vibrate|mute|muted)|is\\s+$ringerNow\\s+(?:on\\s+)?(?:silent|vibrate|muted|loud|on|off)|will\\s+(?:my\\s+)?phone\\s+ring|(?:check\\s+(?:the\\s+)?|what's\\s+(?:the\\s+)?)?ringer(?:\\s+(?:status|mode))?") { status("ringer_mode") })
+        add(Rule("how\\s+bright\\s+is\\s+(?:my|the)\\s+(?:screen|display|phone)|what(?:'s| is)\\s+(?:my|the)\\s+(?:screen\\s+)?brightness(?:\\s+(?:at|level|set to))?|(?:check\\s+(?:the\\s+)?)?brightness(?:\\s+level)?") { status("brightness") })
+        add(Rule("how\\s+loud\\s+is\\s+(?:it|the music|my phone|the volume|the sound)|what(?:'s| is)\\s+(?:my|the)\\s+(?:media\\s+|music\\s+)?volume(?:\\s+(?:at|level|set to))?|(?:check\\s+(?:the\\s+)?)?volume(?:\\s+level)?|is\\s+(?:the\\s+)?(?:music|media|volume|audio)\\s+muted") { status("volume") })
+        add(Rule("what(?:'s| is)\\s+(?:on|turned on|switched on)|what\\s+(?:settings|things|stuff)\\s+(?:are|is)\\s+(?:on|turned on)|(?:what's\\s+my\\s+|give\\s+me\\s+a\\s+|my\\s+)?(?:(?:phone|quick settings|settings|connection|connectivity)\\s+)?status(?:\\s+(?:report|update|check))?") { status("all") })
+
         // Hotspot before Wi-Fi so "wifi hotspot" is the hotspot.
-        addAll(switchRules("hotspot", "hotspot|wifi hotspot|mobile hotspot|personal hotspot|tethering"))
-        addAll(switchRules("flashlight", "flashlight|torch|flash|light|lights|torch light", aloneToggles = true))
-        addAll(switchRules("wifi", "wifi|wireless|wlan|wifi connection"))
-        addAll(switchRules("bluetooth", "bluetooth|bt"))
-        addAll(switchRules("mobile_data", "mobile data|cellular data|cell data|cellular|data|mobile network|internet|mobile internet"))
-        addAll(switchRules("nfc", "nfc|tap to pay|contactless"))
-        addAll(switchRules("airplane_mode", "airplane|aeroplane|flight|plane"))
-        addAll(switchRules("location", "location|location services|gps|location tracking"))
-        addAll(switchRules("dark_mode", "dark|dark theme|night|dark display"))
-        addAll(switchRules("do_not_disturb", "do not disturb|dnd|focus|quiet|quiet hours|focus time"))
-        addAll(switchRules("auto_rotate", "auto-rotate|auto[- ]?rotation|screen rotation|rotation|rotate|screen rotate"))
-        addAll(switchRules("auto_brightness", "auto[- ]?brightness|adaptive brightness|automatic brightness"))
+        addAll(switchRules("hotspot", ALIASES.getValue("hotspot")))
+        addAll(switchRules("flashlight", ALIASES.getValue("flashlight"), aloneToggles = true))
+        addAll(switchRules("wifi", ALIASES.getValue("wifi")))
+        addAll(switchRules("bluetooth", ALIASES.getValue("bluetooth")))
+        addAll(switchRules("mobile_data", ALIASES.getValue("mobile_data")))
+        addAll(switchRules("nfc", ALIASES.getValue("nfc")))
+        addAll(switchRules("airplane_mode", ALIASES.getValue("airplane_mode")))
+        addAll(switchRules("location", ALIASES.getValue("location")))
+        addAll(switchRules("dark_mode", ALIASES.getValue("dark_mode")))
+        addAll(switchRules("do_not_disturb", ALIASES.getValue("do_not_disturb")))
+        addAll(switchRules("auto_rotate", ALIASES.getValue("auto_rotate")))
+        addAll(switchRules("auto_brightness", ALIASES.getValue("auto_brightness")))
         add(Rule("(?:put|set|switch)\\s+(?:my\\s+|the\\s+)?(?:phone|it)\\s+(?:in|into|on|to)\\s+(?:airplane|aeroplane|flight)\\s+mode") { switchCall("airplane_mode", "on") })
         add(Rule("(?:take|get)\\s+(?:my\\s+|the\\s+)?(?:phone|it)\\s+(?:off|out of)\\s+(?:airplane|aeroplane|flight)\\s+mode") { switchCall("airplane_mode", "off") })
         add(Rule("(?:i need|give me|i could use)\\s+(?:some\\s+|a\\s+)?light|(?:i\\s+)?can't see(?:\\s+anything)?\\s+in\\s+the\\s+dark") { switchCall("flashlight", "on") })

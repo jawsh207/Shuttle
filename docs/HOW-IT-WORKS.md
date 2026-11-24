@@ -42,7 +42,7 @@ The two voice settings (listen when the panel opens, speak replies) live in
 1. **You say or type a command** in the panel (`ui/AssistantPanel.kt`).
 2. **The fast path reads it** (`engine/CommandParser.kt`). It tidies the text ("Hey Shuttle,
    um, can you…please" becomes the command itself), then checks it against a list of
-   phrasings. Each command has many: switching Wi-Fi off can be "turn off wifi", "kill the
+   phrasings, questions ("is wifi on?") first. Each command has many: switching Wi-Fi off can be "turn off wifi", "kill the
    wifi", "shut the wifi off" or "wifi off"; turning brightness up can be "brighter" or "the
    screen is too dark". Message text is read exactly as said, so a text ending in "thanks" or
    "now" keeps it. A sentence with several commands ("turn off wifi and bluetooth") is split
@@ -60,6 +60,11 @@ The two voice settings (listen when the panel opens, speak replies) live in
    - `tools/Communication.kt`: calls and texts, including finding contacts by name.
    - `tools/Clock.kt`: alarms, timers, the time and date.
    - `tools/Apps.kt`: opening apps, directions, battery.
+   - `tools/Status.kt`: "is X on?" for every switch, the ringer, brightness and volume, and
+     "what's on?" for a summary. For anything Shuttle can switch, the answer is a card offering
+     the opposite ("Wi-Fi is on. Turn it off?"). Android hides the hotspot's state from apps,
+     so that question offers its settings instead. The flashlight's state only arrives through
+     a notification from Android, which Shuttle starts listening for when the panel opens.
 5. **A card shows what happened** (`ui/AssistantPanel.kt`). The conversation itself is kept by
    `ui/AssistantViewModel.kt`.
 
@@ -107,5 +112,5 @@ timers are created in your own clock app, which rings them.
 | `engine/CommandParser.kt` | Fast-path phrasings to tool calls |
 | `engine/Quantities.kt` | Number words, clock times, durations |
 | `engine/SmallTalk.kt` | Replies to hello, thanks, "what can you do?", "never mind" |
-| `tools/*.kt` | The device tools, grouped as above |
+| `tools/*.kt` | The device tools, grouped as above (`Status.kt` answers "is it on?") |
 | `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |

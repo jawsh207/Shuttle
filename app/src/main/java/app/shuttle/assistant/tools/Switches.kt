@@ -51,10 +51,15 @@ internal object Switches {
 
     /**
      * Torch state as last reported by the camera service. Android doesn't let apps read it on
-     * demand, only via a callback, so "toggle" assumes off until the first report arrives.
+     * demand, only via a callback, so it's null (unknown) until the first report arrives;
+     * "toggle" treats unknown as off. [watchTorch] is called when the panel opens, so the
+     * report has usually arrived by the time anyone asks.
      */
-    @Volatile private var torchOn = false
+    @Volatile var torchOn: Boolean? = null
+        private set
     @Volatile private var torchWatching = false
+
+    fun watchTorch(context: Context) = watchTorch(context.getSystemService(CameraManager::class.java))
 
     private fun watchTorch(cameras: CameraManager) {
         if (torchWatching) return
@@ -75,7 +80,7 @@ internal object Switches {
         val on = when (call.arg("state")) {
             "on" -> true
             "off" -> false
-            else -> !torchOn
+            else -> torchOn != true
         }
         return try {
             cameras.setTorchMode(id, on)

@@ -22,5 +22,6 @@
   {"name": "open_app", "description": "Open an installed app by name.", "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "The app's name as shown in the launcher."}}, "required": ["name"]}},
   {"name": "navigate", "description": "Get directions to a place in the maps app.", "parameters": {"type": "object", "properties": {"destination": {"type": "string", "description": "Place name or address."}}, "required": ["destination"]}},
   {"name": "battery_status", "description": "Report the battery level and whether the phone is charging.", "parameters": {"type": "object", "properties": {}, "required": []}},
+  {"name": "status", "description": "Tell whether a setting is on, or its current level. Offers to switch it.", "parameters": {"type": "object", "properties": {"setting": {"type": "string", "description": "Which setting, or all for a summary.", "enum": ["wifi", "bluetooth", "mobile_data", "nfc", "airplane_mode", "location", "hotspot", "dark_mode", "do_not_disturb", "ringer_mode", "flashlight", "auto_rotate", "auto_brightness", "brightness", "volume", "all"]}}, "required": ["setting"]}},
   {"name": "date_time", "description": "Tell the current time or date.", "parameters": {"type": "object", "properties": {"what": {"type": "string", "description": "Which one.", "enum": ["time", "date"]}}, "required": ["what"]}}
 ]

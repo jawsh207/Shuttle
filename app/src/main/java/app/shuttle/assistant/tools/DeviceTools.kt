@@ -29,6 +29,19 @@ object DeviceTools {
         putAll(Communication.runners)
         putAll(Clock.runners)
         putAll(Apps.runners)
+        putAll(Status.runners)
+    }
+
+    /**
+     * Called when the assistant opens: starts listening for flashlight changes, which Android
+     * only reports through a callback, so "is the flashlight on?" can be answered.
+     */
+    fun prepare(context: Context) {
+        try {
+            Switches.watchTorch(context)
+        } catch (_: Exception) {
+            // No camera service (or none with a flash): the flashlight tools report that themselves.
+        }
     }
 
     /** Names in [ToolSchemas] with no implementation; a unit test keeps this empty. */

@@ -26,6 +26,7 @@ device; nothing is sent anywhere.
 | Clock | "set an alarm for 7:30", "wake me up at quarter to 7", "timer 10 minutes", "remind me in 5 minutes" |
 | Apps and places | "open camera", "navigate to the library" |
 | Status | "battery", "what time is it", "what's the date" |
+| Is it on? | "is Wi-Fi on?", "am I on silent?", "is the flashlight still on?", "what's the volume at?", "what's on?" |
 
 These are only examples: each command understands many everyday wordings ("kill the wifi",
 "it's too bright", "make it louder", "let Sam know I'm late", "wake me up at half past six",
@@ -36,6 +37,10 @@ understands every part.
 
 It also answers the social things people say: hello, thanks, "what can you do?", and "never
 mind" (which closes the panel).
+
+Asking about a setting you can switch offers to flip it ("Wi-Fi is on. Turn it off?"); say or
+tap yes. Android doesn't let apps check the hotspot, so Shuttle offers its settings instead. The
+flashlight is known once Android has reported it, which happens as the panel opens.
 
 Calls and texts always show who and what first and wait for you to tap **Call** or **Send**,
 or to say yes or no.
@@ -79,6 +84,7 @@ setup screen lets you grant things ahead of time.
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
+| Wi-Fi and network state (granted at install) | Answering "is Wi-Fi on?" and "is mobile data on?" |
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
 | Modify system settings (special) | Brightness and auto-rotate |

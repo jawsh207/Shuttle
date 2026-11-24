@@ -11,6 +11,9 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Needed to show the system "turn on Bluetooth?" prompt on Android 12+. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Answering "is Wi-Fi on?" and "is mobile data on?". Granted at install. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Voice input. The user's speech recogniser does the recording, but recognisers only
          accept callers that hold this permission. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

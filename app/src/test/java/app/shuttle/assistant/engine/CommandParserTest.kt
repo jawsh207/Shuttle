@@ -239,6 +239,42 @@ class CommandParserTest {
         check("what day of the week is it", call("date_time", "what" to "date"))
     }
 
+    @Test fun askingWhetherSomethingIsOn() {
+        val st = { setting: String -> call("status", "setting" to setting) }
+        check("is wifi on?", st("wifi"))
+        check("Is the Wi-Fi off", st("wifi"))
+        check("am I connected to wifi", st("wifi"))
+        check("is bluetooth turned on", st("bluetooth"))
+        check("do I have mobile data on", st("mobile_data"))
+        check("is my location on", st("location"))
+        check("check airplane mode", st("airplane_mode"))
+        check("is the hotspot on", st("hotspot"))
+        check("is the flashlight still on", st("flashlight"))
+        check("is the light on", st("flashlight"))
+        check("is dark mode on", st("dark_mode"))
+        check("is do not disturb on", st("do_not_disturb"))
+        check("am I on DND", st("do_not_disturb"))
+        check("is auto-rotate on", st("auto_rotate"))
+        check("nfc status", st("nfc"))
+        check("am I on silent", st("ringer_mode"))
+        check("is my phone on vibrate", st("ringer_mode"))
+        check("will my phone ring", st("ringer_mode"))
+        check("what's my brightness at", st("brightness"))
+        check("how bright is the screen", st("brightness"))
+        check("what's the volume at", st("volume"))
+        check("how loud is it", st("volume"))
+        check("is the music muted", st("volume"))
+        check("volume", st("volume"))
+        check("what's on", st("all"))
+        check("what settings are on", st("all"))
+        check("status", st("all"))
+        check("give me a status update", st("all"))
+        // Changing a setting is still a change, not a question.
+        check("wifi on", call("wifi", "state" to "on"))
+        check("turn on bluetooth", call("bluetooth", "state" to "on"))
+        check("brightness up", call("brightness", "level" to "up"))
+    }
+
     @Test fun severalCommandsAtOnce() {
         assertEquals(
             listOf(call("wifi", "state" to "off"), call("bluetooth", "state" to "off")),
@@ -279,7 +315,7 @@ class CommandParserTest {
     @Test fun everyCallNamesARealTool() {
         val phrases = listOf("flashlight on", "silence my phone", "brightness 40%", "volume up", "play",
             "set a timer for 5 minutes", "set an alarm for 7 am", "call Mom", "text Sam: hi", "open camera",
-            "navigate to work", "battery", "what time is it", "wifi off", "hotspot on")
+            "navigate to work", "battery", "what time is it", "wifi off", "hotspot on", "is wifi on")
         for (p in phrases) {
             val name = CommandParser.parse(p)?.name
             assertEquals(p, true, name != null && ToolSchemas.find(name) != null)

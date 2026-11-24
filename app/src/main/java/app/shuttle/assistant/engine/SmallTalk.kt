@@ -18,8 +18,8 @@ object SmallTalk {
     const val HELP =
         "I can switch things like the flashlight, Do Not Disturb and silent mode, change brightness " +
             "and volume, control music, set alarms and timers, call and text your contacts, open apps, " +
-            "give directions, and tell you the time or your battery level. Try \"set a timer for 10 " +
-            "minutes\" or \"text Sam saying I'm on my way\"."
+            "give directions, tell you the time or your battery level, and check what's switched on. " +
+            "Try \"set a timer for 10 minutes\" or \"text Sam saying I'm on my way\"."
 
     fun reply(input: String): Reply? {
         val s = input.lowercase().replace('’', '\'').replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()

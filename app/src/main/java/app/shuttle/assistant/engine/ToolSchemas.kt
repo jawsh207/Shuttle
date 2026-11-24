@@ -11,6 +11,12 @@ package app.shuttle.assistant.engine
  */
 object ToolSchemas {
 
+    /** Settings the status tool can report on. */
+    val STATUS_SETTINGS = listOf(
+        "wifi", "bluetooth", "mobile_data", "nfc", "airplane_mode", "location", "hotspot", "dark_mode",
+        "do_not_disturb", "ringer_mode", "flashlight", "auto_rotate", "auto_brightness", "brightness", "volume", "all",
+    )
+
     private fun switch(name: String, what: String, note: String = "") =
         ToolSpec(name, "Turn $what on or off.$note", listOf(StateParam))
 
@@ -82,6 +88,10 @@ object ToolSchemas {
             listOf(Param("destination", ParamType.STRING, "Place name or address.")),
         ),
         ToolSpec("battery_status", "Report the battery level and whether the phone is charging."),
+        ToolSpec(
+            "status", "Tell whether a setting is on, or its current level. Offers to switch it.",
+            listOf(Param("setting", ParamType.STRING, "Which setting, or all for a summary.", options = STATUS_SETTINGS)),
+        ),
         ToolSpec(
             "date_time", "Tell the current time or date.",
             listOf(Param("what", ParamType.STRING, "Which one.", options = listOf("time", "date"))),
