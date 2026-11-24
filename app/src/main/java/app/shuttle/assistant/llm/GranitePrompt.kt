@@ -39,15 +39,7 @@ object GranitePrompt {
      * (`{"name": …, "description": …, "parameters": …}`); empty means no tools.
      */
     fun build(system: String, tools: List<String>, messages: List<Message>): String = buildString {
-        append("<|im_start|>system\n").append(system)
-        if (tools.isNotEmpty()) {
-            if (system.isNotEmpty()) append("\n\n")
-            append("# Tools\n\nYou have access to the following functions:\n\n<tools>")
-            tools.forEach { append('\n').append(it) }
-            append("\n</tools>")
-            append(TOOL_INSTRUCTIONS)
-        }
-        append("<|im_end|>\n")
+        append(systemBlock(system, tools))
         var i = 0
         while (i < messages.size) {
             val m = messages[i]
@@ -68,6 +60,22 @@ object GranitePrompt {
             i++
         }
         append("<|im_start|>assistant\n<think></think>")
+    }
+
+    /**
+     * The system turn on its own: instructions and tools. Every prompt starts with exactly
+     * this text, which is what lets the model read it once and reuse it.
+     */
+    fun systemBlock(system: String, tools: List<String>): String = buildString {
+        append("<|im_start|>system\n").append(system)
+        if (tools.isNotEmpty()) {
+            if (system.isNotEmpty()) append("\n\n")
+            append("# Tools\n\nYou have access to the following functions:\n\n<tools>")
+            tools.forEach { append('\n').append(it) }
+            append("\n</tools>")
+            append(TOOL_INSTRUCTIONS)
+        }
+        append("<|im_end|>\n")
     }
 
     private val callPattern = Regex("<tool_call>\\s*<function=([^>\\s]+)>(.*?)</function>\\s*</tool_call>", RegexOption.DOT_MATCHES_ALL)

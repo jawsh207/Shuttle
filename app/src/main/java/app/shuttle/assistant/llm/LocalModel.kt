@@ -9,17 +9,21 @@ import java.util.concurrent.Executors
  * The downloaded model, ready to answer: loads it on first use, runs one reply at a time on a
  * background thread, and unloads it after a few idle minutes to give the memory back.
  *
- * Loading takes a few seconds and holds about 3 GB of memory while loaded, so it happens only
- * when a request actually needs the model (the rule parser answers everything it can without
- * it), and the model is let go once the conversation goes quiet. The context is capped at
- * 8K tokens, plenty for an assistant and far less memory than the model's full 128K.
+ * Reading a prompt is the slow part on a phone's CPU, far slower than writing the reply, and
+ * every prompt starts with the same instructions and tool list. So [prepare] loads the model
+ * and reads that shared start as soon as the assistant opens; a request then only has to read
+ * the new words. The model holds about 3 GB while loaded and is let go after ten quiet
+ * minutes. The context is capped at 8K tokens, plenty for an assistant and far less memory
+ * than the model's full 128K.
  */
 object LocalModel {
 
     private const val CONTEXT = 8192
-    private const val IDLE_UNLOAD_MS = 5 * 60 * 1000L
+    private const val IDLE_UNLOAD_MS = 10 * 60 * 1000L
 
     sealed interface Event {
+        /** What's happening before the first words: "Loading the model…", "Thinking…". */
+        data class Status(val text: String) : Event
         /** The visible reply so far (already cleaned of tool-call markup by the caller). */
         data class Text(val raw: String) : Event
         data class Finished(val raw: String) : Event
@@ -34,9 +38,28 @@ object LocalModel {
     @Volatile private var loadedPath: String? = null
     @Volatile private var cancelled = false
 
-    /** Stops the reply being written, at the next piece. */
+    /** Stops the reply being written straight away, even while it's still reading. */
     fun cancel() {
         cancelled = true
+        handle.takeIf { it != 0L }?.let { LlamaEngine.nativeCancel(it) }
+    }
+
+    /**
+     * Loads the model and reads [prefix] (the instructions and tools every prompt starts
+     * with) in the background, so the next request only reads what's new. Does nothing if a
+     * reply is being written.
+     */
+    fun prepare(file: File, prefix: String) {
+        main.removeCallbacks(unload)
+        worker.execute {
+            try {
+                if (ensureLoaded(file)) LlamaEngine.nativeGenerate(handle, prefix, 0, 0f) { false }
+            } catch (_: Throwable) {
+                // A failed warm-up just means the first request does the work instead.
+            } finally {
+                main.postDelayed(unload, IDLE_UNLOAD_MS)
+            }
+        }
     }
 
     /**
@@ -47,7 +70,7 @@ object LocalModel {
     fun generate(
         file: File,
         prompt: String,
-        maxTokens: Int = 512,
+        maxTokens: Int = 320,
         temperature: Float = 0.3f,
         shouldStop: (String) -> Boolean = { false },
         onEvent: (Event) -> Unit,
@@ -56,10 +79,16 @@ object LocalModel {
         cancelled = false
         worker.execute {
             try {
+                if (cancelled) {
+                    post(onEvent, Event.Finished(""))
+                    return@execute
+                }
+                if (handle == 0L || loadedPath != file.path) post(onEvent, Event.Status("Loading the model…"))
                 if (!ensureLoaded(file)) {
                     post(onEvent, Event.Failed("The model couldn't be loaded. Try deleting and downloading it again in Settings."))
                     return@execute
                 }
+                post(onEvent, Event.Status("Thinking…"))
                 val out = StringBuilder()
                 var lastSent = 0L
                 val code = LlamaEngine.nativeGenerate(handle, prompt, maxTokens, temperature) { bytes ->
@@ -73,7 +102,7 @@ object LocalModel {
                     !cancelled && !shouldStop(out.toString())
                 }
                 when (code) {
-                    0 -> post(onEvent, Event.Finished(out.toString()))
+                    0, -4 -> post(onEvent, Event.Finished(out.toString()))
                     -2 -> post(onEvent, Event.Failed("This chat is too long for the model. Start a new chat to keep going."))
                     else -> post(onEvent, Event.Failed("The model stopped unexpectedly (code $code)."))
                 }

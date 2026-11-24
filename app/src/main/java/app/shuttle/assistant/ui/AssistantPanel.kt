@@ -256,8 +256,13 @@ private fun ResultCard(
     Card(colors = colors, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (exchange.thinking && result.text.isBlank()) {
-                // The model is reading the request; text appears as it's written.
-                LoadingIndicator(Modifier.size(36.dp))
+                // The model is loading or reading the request; text appears as it's written.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LoadingIndicator(Modifier.size(36.dp))
+                    if (exchange.status.isNotEmpty()) {
+                        Text(exchange.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             } else {
                 Text(result.text, style = MaterialTheme.typography.bodyLarge)
             }

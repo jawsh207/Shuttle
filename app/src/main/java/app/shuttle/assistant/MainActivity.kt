@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import app.shuttle.assistant.chats.ChatPrefs
 import app.shuttle.assistant.chats.ChatStore
+import app.shuttle.assistant.llm.LocalModel
 import app.shuttle.assistant.llm.ModelManager
+import app.shuttle.assistant.llm.ModelPrompts
 import app.shuttle.assistant.tools.DeviceTools
 import app.shuttle.assistant.ui.AssistantViewModel
 import app.shuttle.assistant.ui.ChatScreen
@@ -52,6 +54,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         DeviceTools.prepare(this)
         ModelManager.start(this)
+        // Load the model and read its instructions now, so the first question is quick.
+        ModelManager.ready?.let { LocalModel.prepare(it.file, ModelPrompts.prefix()) }
         val prefs = VoicePrefs(this)
         val chatPrefs = ChatPrefs(this)
         val store = ChatStore(File(filesDir, "chats"))

@@ -17,6 +17,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -35,7 +36,14 @@ struct Engine {
     const llama_vocab * vocab = nullptr;
     std::vector<llama_token> cached;  // tokens currently held in the KV cache, in order
     int n_batch = 512;
+    std::atomic<bool> abort{false};   // set by nativeCancel from the UI thread
 };
+
+// Checked by llama.cpp during every computation, so Stop works even while a long prompt is
+// still being read, not only between words of the reply.
+bool should_abort(void * data) {
+    return static_cast<Engine *>(data)->abort.load();
+}
 
 void log_callback(ggml_log_level level, const char * text, void *) {
     if (level >= GGML_LOG_LEVEL_ERROR) {
@@ -111,6 +119,7 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeLoad(JNIEnv * env, jobject, jst
     e->ctx = ctx;
     e->vocab = llama_model_get_vocab(model);
     e->batch = llama_batch_ext_init(ctx);
+    llama_set_abort_callback(ctx, should_abort, e);
     e->n_batch = static_cast<int>(cp.n_batch);
     LOGI("model loaded, n_ctx=%d threads=%d", n_ctx, n_threads);
     return reinterpret_cast<jlong>(e);
@@ -118,13 +127,15 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeLoad(JNIEnv * env, jobject, jst
 
 // Runs `prompt` (already formatted with the model's chat template) and streams the reply.
 // `callback.onPiece(byte[])` gets each chunk of complete UTF-8 text and returns false to stop.
-// Returns 0 when the model finished or was stopped, or a negative code on failure:
+// With max_tokens = 0 it only reads the prompt into the cache (warming up for the next turn).
+// Returns 0 when the model finished, -4 when it was stopped, or a negative code on failure:
 // -1 tokenizing failed, -2 prompt too long for the context, -3 model failure.
 JNIEXPORT jint JNICALL
 Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
         JNIEnv * env, jobject, jlong handle, jstring jprompt, jint max_tokens, jfloat temperature, jobject callback) {
     auto * e = reinterpret_cast<Engine *>(handle);
     if (!e) return -3;
+    e->abort = false;
 
     jclass cls = env->GetObjectClass(callback);
     jmethodID on_piece = env->GetMethodID(cls, "onPiece", "([B)Z");
@@ -151,9 +162,10 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
     llama_memory_seq_rm(llama_get_memory(e->ctx), 0, static_cast<llama_pos>(keep), -1);
     e->cached.assign(tokens.begin(), tokens.begin() + static_cast<long>(keep));
     if (!feed(*e, tokens, keep)) {
+        // A stopped or failed read leaves the cache half-written: start clean next time.
         e->cached.clear();
         llama_memory_clear(llama_get_memory(e->ctx), true);
-        return -3;
+        return e->abort ? -4 : -3;
     }
     e->cached = tokens;
 
@@ -169,6 +181,10 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
     std::string pending;
     int result = 0;
     for (int i = 0; i < max_tokens; ++i) {
+        if (e->abort) {
+            result = -4;
+            break;
+        }
         const llama_token tok = llama_sampler_sample(smpl, e->ctx, -1);
         if (llama_vocab_is_eog(e->vocab, tok)) break;
 
@@ -194,12 +210,22 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
         llama_batch_ext_set_pos(e->batch, idx, &pos);
         llama_batch_ext_set_output_logits(e->batch, idx, true);
         if (llama_process(e->ctx, LLAMA_PROCESS_TYPE_DECODE, e->batch) != 0) {
-            result = -3;
+            // The last token isn't in the cache after a stop or failure; drop it from the list.
+            e->cached.pop_back();
+            llama_memory_seq_rm(llama_get_memory(e->ctx), 0, static_cast<llama_pos>(e->cached.size()), -1);
+            result = e->abort ? -4 : -3;
             break;
         }
     }
     llama_sampler_free(smpl);
     return result;
+}
+
+// Asks a running nativeGenerate to stop as soon as possible. Safe from any thread.
+JNIEXPORT void JNICALL
+Java_app_shuttle_assistant_llm_LlamaEngine_nativeCancel(JNIEnv *, jobject, jlong handle) {
+    auto * e = reinterpret_cast<Engine *>(handle);
+    if (e) e->abort = true;
 }
 
 JNIEXPORT void JNICALL

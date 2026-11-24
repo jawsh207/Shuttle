@@ -47,6 +47,8 @@ class AssistantViewModel : ViewModel() {
         val settled: Boolean = false,
         /** The model is still writing this reply. */
         val thinking: Boolean = false,
+        /** Shown while [thinking] before the first words: "Loading the model…", "Thinking…". */
+        val status: String = "",
     )
 
     /** True while the model is writing; new requests wait (or the user stops it). */
@@ -152,9 +154,14 @@ class AssistantViewModel : ViewModel() {
         askModel(context, asked, model, after)
     }
 
-    /** Stops the model mid-reply; what it wrote so far stays. */
+    private var stopped = false
+
+    /** Stops the model mid-reply, even while it's still reading; what it wrote so far stays. */
     fun stopThinking() {
-        if (thinking) LocalModel.cancel()
+        if (thinking) {
+            stopped = true
+            LocalModel.cancel()
+        }
     }
 
     private fun noModelYet(): String {
@@ -178,9 +185,11 @@ class AssistantViewModel : ViewModel() {
         val placeholder = Exchange(nextId++, asked, ToolResult.Done(""), thinking = true)
         exchanges += placeholder
         thinking = true
+        stopped = false
         val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, history + GranitePrompt.Message(GranitePrompt.Role.USER, asked))
         LocalModel.generate(model.file, prompt) { event ->
             when (event) {
+                is LocalModel.Event.Status -> replace(placeholder.id) { it.copy(status = event.text) }
                 is LocalModel.Event.Text -> replace(placeholder.id) { it.copy(result = ToolResult.Done(GranitePrompt.visibleText(event.raw))) }
                 is LocalModel.Event.Failed -> {
                     replace(placeholder.id) { it.copy(result = ToolResult.Failed(event.message), thinking = false) }
@@ -194,7 +203,7 @@ class AssistantViewModel : ViewModel() {
                     val calls = GranitePrompt.toolCalls(event.raw).mapNotNull(ModelPrompts::sanitize)
                     if (calls.isEmpty()) {
                         replace(placeholder.id) {
-                            it.copy(result = ToolResult.Done(text.ifBlank { "I don't have an answer for that." }), thinking = false)
+                            it.copy(result = ToolResult.Done(text.ifBlank { if (stopped) "Stopped." else "I don't have an answer for that." }), thinking = false)
                         }
                         persist()
                         return@generate after(false)

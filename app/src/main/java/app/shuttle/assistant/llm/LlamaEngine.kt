@@ -22,10 +22,14 @@ object LlamaEngine {
     external fun nativeLoad(path: String, nCtx: Int, nThreads: Int): Long
 
     /**
-     * Streams a reply to [prompt]. Returns 0 when finished or stopped; -1 if the prompt
-     * couldn't be tokenized, -2 if it doesn't fit the context, -3 if the model failed.
+     * Streams a reply to [prompt]; with [maxTokens] 0 it only reads the prompt (warm-up).
+     * Returns 0 when finished, -4 when stopped by [nativeCancel]; -1 if the prompt couldn't be
+     * tokenized, -2 if it doesn't fit the context, -3 if the model failed.
      */
     external fun nativeGenerate(handle: Long, prompt: String, maxTokens: Int, temperature: Float, sink: PieceSink): Int
+
+    /** Stops a running [nativeGenerate] as soon as possible, even mid-prompt. Any thread. */
+    external fun nativeCancel(handle: Long)
 
     external fun nativeFree(handle: Long)
 }

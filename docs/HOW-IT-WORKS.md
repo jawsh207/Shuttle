@@ -102,9 +102,14 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   pinned to a release). `app/src/main/cpp/shuttle_llm.cpp` is a small bridge that loads a model,
   runs a prompt and streams the reply back; `llm/LlamaEngine.kt` is its Kotlin side. Each turn
   re-uses what the model already read last time, so long chats stay quick.
-- **Loading and memory.** `llm/LocalModel.kt` loads the model the first time a request needs it
-  (a few seconds), runs one reply at a time on a background thread, and frees the memory (about
-  3 GB) after five quiet minutes. The conversation is capped at 8,000 tokens.
+- **Loading and memory.** `llm/LocalModel.kt` runs one reply at a time on a background thread.
+  On a phone's CPU, reading a prompt is far slower than writing the answer, and every prompt
+  starts with the same instructions and tool list. So when Shuttle opens, it loads the model
+  (a few seconds) and reads that shared start straight away; a question then only has to read
+  the new words. The model's memory (about 3 GB) is freed after ten quiet minutes. The
+  conversation is capped at 8,000 tokens.
+- **Stopping.** Stop asks the native code to abort, which llama.cpp checks during every step of
+  its work, so it stops even while a long prompt is still being read.
 - **Getting the model.** `llm/ModelManager.kt` keeps track of it and `llm/ModelDownloadService.kt`
   downloads it, only when the user taps Download. Shuttle downloads it itself, as a background
   service with a progress notification, rather than handing it to Android's system downloader:
@@ -118,7 +123,10 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   (from its published chat template, with thinking off so answers start straight away) and
   reads tool calls out of the reply. `llm/ModelPrompts.kt` holds the instructions it's given:
   short answers, use the phone's tools for actions, and say it can't go online rather than
-  guess. It's offered exactly the tools in `docs/tools.json`.
+  guess. To keep that start short and unchanging, it holds only the date (not the time), and
+  the model sees a compact tool list: the twelve on/off switches are one "set switch" tool and
+  every "is it on?" question is one "check setting" tool, which are turned back into the real
+  tools before anything runs.
 - **Doing things.** When the model asks for a tool, the call runs through the same device tools
   as a typed command. Arguments the tool doesn't declare are thrown away first, so the model
   can't mark a call or text as already confirmed: those always stop at the confirmation card.

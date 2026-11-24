@@ -155,6 +155,8 @@ object ModelManager {
             .remove("download_spec")
             .apply()
         main.post { update = null }
+        // Get it ready for the first question.
+        LocalModel.prepare(target, ModelPrompts.prefix())
         return State.Ready(spec, target)
     }
 

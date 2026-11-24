@@ -86,8 +86,12 @@ limit, and nothing you ask leaves the phone.
   Settings offers the update. Users never pick or configure a model.
 - **Tools:** the model can use every phone command. Calls and texts it starts still stop at the
   confirmation card, and it can't skip it.
-- **Memory:** about 3 GB while loaded. It loads on the first request that needs it and unloads
-  after five quiet minutes.
+- **Speed:** the phone's processor reads the model's instructions once, when Shuttle opens, and
+  reuses them, so each question only has to read your words. The first question after opening
+  can still wait a little for that. Replies stream in as they're written, and **Stop** works at
+  any point.
+- **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
+  after ten quiet minutes.
 - **No internet yet:** the model can't look things up, and it says so rather than guessing (see
   [Roadmap](#roadmap)).
 

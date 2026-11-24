@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDateTime
+import java.time.LocalDate
 
 class ModelPromptsTest {
 
@@ -20,13 +20,25 @@ class ModelPromptsTest {
         assertNull(ModelPrompts.sanitize(ToolCall("format_phone")))
     }
 
-    @Test fun everyToolIsOffered() {
-        assertEquals(ToolSchemas.all.size, ModelPrompts.tools.size)
-        assertTrue(ModelPrompts.tools.all { it.startsWith("{\"name\": ") && !it.contains('\n') })
+    @Test fun compactToolsMapToRealOnes() {
+        assertEquals(ToolCall("wifi", mapOf("state" to "off")), ModelPrompts.sanitize(ToolCall("set_switch", mapOf("setting" to "wifi", "state" to "off"))))
+        assertEquals(ToolCall("status", mapOf("setting" to "bluetooth")), ModelPrompts.sanitize(ToolCall("check_setting", mapOf("setting" to "bluetooth"))))
+        assertNull(ModelPrompts.sanitize(ToolCall("set_switch", mapOf("setting" to "send_sms", "state" to "on"))))
+        assertEquals(ToolCall("battery_status"), ModelPrompts.sanitize(ToolCall("battery_status")))
     }
 
-    @Test fun systemMessageHasTheDate() {
-        val s = ModelPrompts.system(LocalDateTime.of(2026, 11, 24, 17, 5))
-        assertTrue(s, s.contains("Tuesday, November 24, 2026") && s.contains("5:05 PM"))
+    @Test fun toolListIsCompact() {
+        assertTrue(ModelPrompts.tools.all { it.startsWith("{\"name\": ") && !it.contains('\n') })
+        // Far smaller than the full list (~7 KB): it's read before every first answer.
+        val size = ModelPrompts.prefix().length
+        assertTrue("prefix is $size chars", size < 6000)
+    }
+
+    @Test fun promptStartIsStableAndDatedOnly() {
+        val s = ModelPrompts.system(LocalDate.of(2026, 11, 24))
+        assertTrue(s, s.contains("Tuesday, November 24, 2026"))
+        assertEquals(ModelPrompts.prefix(), ModelPrompts.prefix())
+        val full = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, listOf(GranitePrompt.Message(GranitePrompt.Role.USER, "hi")))
+        assertTrue(full.startsWith(ModelPrompts.prefix()))
     }
 }
