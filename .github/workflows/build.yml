@@ -1,0 +1,241 @@
+name: Build
+
+# Every push to main builds a signed, optimized APK (an updatable test build).
+# Releases, any of:
+#  - Actions › "Build release" › Run workflow (release.yml calls this with the new tag);
+#  - push a new release-notes/vX.Y.Z.md to main;
+#  - create a release on GitHub (which pushes the tag).
+# The run builds the APK, creates the vX.Y.Z tag and publishes the GitHub Release with a
+# change log of every commit since the previous release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Version to release, e.g. v0.5.0 (must not exist yet)
+        type: string
+        required: true
+      release_summary:
+        description: Optional one-line summary for the top of the release notes
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: write # create tags and releases
+
+concurrency:
+  group: build-${{ github.ref }}
+  # Never cancel a run midway: it may be creating a tag and release.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.SHUTTLE_KEYSTORE_BASE64 != '' }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history + tags, for release notes
+
+      - name: Detect release
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          TAG=""; NEW=false
+          if [[ -n "$INPUT_TAG" ]]; then
+            TAG="$INPUT_TAG"         # "Build release" workflow
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              echo "::error title=Version exists::$TAG is already tagged"; exit 1
+            fi
+            NEW=true
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="$GITHUB_REF_NAME"   # release created on GitHub; tag already exists
+          elif [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              FILES=$(git ls-files 'release-notes/v*.md')
+            else
+              FILES=$(git diff --name-only --diff-filter=AM "$BEFORE" "$GITHUB_SHA" -- release-notes/)
+            fi
+            # Newest version whose notes were added or changed in this push and isn't tagged yet.
+            TAG=$(for f in $FILES; do
+                    v=$(basename "$f" .md)
+                    [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+                    git rev-parse -q --verify "refs/tags/$v" >/dev/null && continue
+                    echo "$v"
+                  done | sort -V | tail -1)
+            [[ -n "$TAG" ]] && NEW=true
+          fi
+          LAST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          {
+            echo "RELEASE_TAG=$TAG"
+            echo "RELEASE_NEW=$NEW"
+            if [[ -n "$TAG" ]]; then
+              echo "SHUTTLE_VERSION_NAME=$TAG"
+            else
+              echo "SHUTTLE_VERSION_NAME=${LAST:-v0.1.0}-ci.$GITHUB_RUN_NUMBER"
+            fi
+            # versionCode: minutes since Nov 2023. Rises with every build from either
+            # workflow (test builds and releases), so each APK installs as an update.
+            echo "SHUTTLE_VERSION_CODE=$(( ($(date +%s) - 1700000000) / 60 ))"
+          } >> "$GITHUB_ENV"
+          echo "release tag: ${TAG:-none} (new: $NEW)"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Decode signing key
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          echo "${{ secrets.SHUTTLE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/shuttle.jks"
+          echo "SHUTTLE_KEYSTORE_FILE=$RUNNER_TEMP/shuttle.jks" >> "$GITHUB_ENV"
+
+      # Unit tests, then the optimized (R8, non-debuggable) release build. Without the signing
+      # secrets it still compiles, so code errors show up, but no APK is published.
+      - name: Test and build release APK
+        shell: bash
+        env:
+          SHUTTLE_KEYSTORE_PASSWORD: ${{ secrets.SHUTTLE_KEYSTORE_PASSWORD }}
+          SHUTTLE_KEY_ALIAS: ${{ secrets.SHUTTLE_KEY_ALIAS }}
+          SHUTTLE_KEY_PASSWORD: ${{ secrets.SHUTTLE_KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          # Unit tests first: a failing test stops the build, so no APK is published.
+          ./gradlew --stacktrace testDebugUnitTest assembleRelease 2>&1 | tee build.log
+
+      - name: Report unit tests
+        if: always()
+        shell: bash
+        run: |
+          # One line on the run page: how many unit tests ran and failed.
+          python3 - <<'PYEOF'
+          import glob, xml.etree.ElementTree as ET
+          files = glob.glob("app/build/test-results/testDebugUnitTest/*.xml")
+          total = failed = 0
+          for f in files:
+              r = ET.parse(f).getroot()
+              total += int(r.get("tests", 0)); failed += int(r.get("failures", 0)) + int(r.get("errors", 0))
+          if files:
+              level = "error" if failed else "notice"
+              print(f"::{level} title=Unit tests::{total - failed} of {total} passed")
+          PYEOF
+
+      - name: Report build errors
+        if: failure()
+        shell: bash
+        run: |
+          # Surface compiler/Gradle errors as annotations (visible on the run page and via API).
+          python3 - <<'PYEOF'
+          import os, re
+          if not os.path.exists("build.log"):
+              raise SystemExit(0)
+          lines = open("build.log", errors="replace").read().splitlines()
+          picked = []
+          for i, line in enumerate(lines):
+              if re.match(r"^(e: |w: .*error)|.*error:|^\* What went wrong|^FAILURE|Could not resolve|> |^ERROR:|Missing class| FAILED$|AssertionError|expected:<", line):
+                  picked.extend(lines[i:i + (120 if line.startswith("* What went wrong") else 1)])
+          seen, uniq = set(), []
+          for l in picked:
+              if l not in seen:
+                  seen.add(l); uniq.append(l)
+          text = "\n".join(uniq)[:60000] or "\n".join(lines[-80:])
+          chunks = [text[i:i + 6000] for i in range(0, len(text), 6000)][:10]
+          for n, c in enumerate(chunks, 1):
+              msg = c.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::error title=Build errors {n}/{len(chunks)}::{msg}")
+          PYEOF
+
+      - name: Require signing key
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          echo "::error title=Signing key missing::Add the SHUTTLE_KEYSTORE_BASE64, SHUTTLE_KEYSTORE_PASSWORD, SHUTTLE_KEY_ALIAS and SHUTTLE_KEY_PASSWORD repository secrets (see README › Signing). The code compiled, but no APK is published without them."
+          exit 1
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk "out/Shuttle-${SHUTTLE_VERSION_NAME}.apk"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shuttle-${{ env.SHUTTLE_VERSION_NAME }}
+          path: out/*.apk
+
+      # Only after a successful, signed build: tag this commit.
+      - name: Create release tag
+        if: env.RELEASE_NEW == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" -m "Shuttle $RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+      - name: Write release notes
+        if: env.RELEASE_TAG != ''
+        shell: bash
+        env:
+          SUMMARY: ${{ inputs.release_summary }}
+        run: |
+          git fetch --force --tags origin >/dev/null 2>&1 || true
+          TAG="$RELEASE_TAG"
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
+          {
+            # Summary: release-notes/<tag>.md, else the summary typed into "Build release",
+            # else a hand-written annotated tag message.
+            if [ -f "release-notes/$TAG.md" ]; then
+              cat "release-notes/$TAG.md"
+              echo
+            elif [ -n "${SUMMARY//[[:space:]]/}" ]; then
+              echo "**$SUMMARY**"
+              echo
+            elif [ "$(git cat-file -t "$TAG")" = "tag" ]; then
+              MSG=$(git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP/,$d')
+              if [ -n "$MSG" ] && [ "$MSG" != "Shuttle $TAG" ]; then echo "$MSG"; echo; fi
+            fi
+            # Change log: every commit since the previous release (release bookkeeping left out).
+            echo "## Changes"
+            echo
+            if [ -n "$PREV" ]; then RANGE="$PREV..$TAG"; else RANGE="$TAG"; fi
+            CHANGES=$(git log --no-merges --format='- %s' "$RANGE" | grep -v -E '^- Release v[0-9]' || true)
+            echo "${CHANGES:-- Maintenance release}"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "**Full changelog:** https://github.com/$GITHUB_REPOSITORY/compare/$PREV...$TAG"
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish GitHub Release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="$RELEASE_TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Release was created on GitHub (which made the tag): attach the APK, and fill in
+            # the title and notes unless someone already wrote notes there.
+            gh release upload "$TAG" out/*.apk --clobber
+            BODY=$(gh release view "$TAG" --json body -q .body)
+            if [ -z "${BODY//[[:space:]]/}" ]; then
+              gh release edit "$TAG" --title "Shuttle $TAG" --notes-file release-notes.md
+            fi
+          else
+            gh release create "$TAG" out/*.apk --title "Shuttle $TAG" --notes-file release-notes.md --verify-tag
+          fi

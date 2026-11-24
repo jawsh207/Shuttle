@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A weaving shuttle: pointed body, bobbin slot, and a thread trailing from it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,62 C38,48 70,40 82,44 C76,56 46,66 28,62 Z" />
+    <path
+        android:fillColor="#1F3A5F"
+        android:pathData="M47,57 C52,52 61,49 67,49 C63,53 54,57 47,57 Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M57,53 C50,62 40,70 30,74" />
+</vector>

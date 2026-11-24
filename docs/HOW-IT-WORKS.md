@@ -1,0 +1,80 @@
+# How Shuttle works
+
+A plain-language tour of what happens when you ask Shuttle something, and which file does
+each part. Paths are under `app/src/main/java/app/shuttle/assistant/`.
+
+## Opening the assistant
+
+When Shuttle is your default digital assistant, the assist gesture or a long-press of the power
+button opens **the assistant panel** (`assist/AssistActivity.kt`): a sheet at the bottom of the
+screen over whatever you were doing. Tap the dimmed area or press back to close it. Each time
+it opens it starts a fresh conversation.
+
+Shuttle becomes eligible for the assistant role by handling Android's "assist" request with an
+ordinary activity. It doesn't register as a full voice-interaction service, because Android
+would then also make Shuttle your system speech recogniser, replacing whichever speech-to-text
+app you use.
+
+The app's own icon opens **setup** (`MainActivity.kt`): a checklist for choosing Shuttle as
+assistant, granting permissions and special accesses, and a button to try a command.
+
+## From words to action
+
+1. **You type a command** in the panel (`ui/AssistantPanel.kt`).
+2. **The fast path reads it** (`engine/CommandParser.kt`). It tidies the text ("Hey Shuttle,
+   can you…please" becomes the command itself), then checks it against a list of phrasings
+   such as "turn on X", "call X", "timer for X". Numbers said as words, clock times and
+   durations are handled by `engine/Quantities.kt` ("seven thirty pm", "an hour and a half").
+   An alarm without am/pm ("wake me at 6") goes to whichever 6 o'clock comes next.
+3. **The result is a tool call**: a tool name and its arguments, such as `set_timer` with
+   `seconds = 600`. Every tool and its arguments are listed in `engine/ToolSchemas.kt`, which
+   is also exported as [tools.json](tools.json) for a tool-calling model.
+4. **The tool runs** (`tools/DeviceTools.kt` finds it by name):
+   - `tools/Switches.kt`: flashlight, Wi-Fi, mobile data, NFC, Bluetooth, airplane mode,
+     location, hotspot, dark theme, Do Not Disturb, auto-rotate, brightness.
+   - `tools/Sound.kt`: ringer mode, media volume, play/pause/next/previous.
+   - `tools/Communication.kt`: calls and texts, including finding contacts by name.
+   - `tools/Clock.kt`: alarms, timers, the time and date.
+   - `tools/Apps.kt`: opening apps, directions, battery.
+5. **A card shows what happened** (`ui/AssistantPanel.kt`). The conversation itself is kept by
+   `ui/AssistantViewModel.kt`.
+
+If the fast path doesn't recognise the command, the panel says it can't do that yet. That's
+where the on-device model will go.
+
+## Cards that need you
+
+- **Confirm**: calls and texts show who (and what, for a text) with **Call** or **Send**. A text
+  like "text Sam I'm running late" has no clear break between name and message, so Shuttle tries
+  the first three words, then two, then one, against your contacts, and shows the split it found.
+  Confirming sends exactly what the card showed.
+- **Allow**: when a tool needs something you haven't granted. Normal permissions (contacts,
+  phone, SMS, nearby devices) use Android's permission dialog and then carry on. Do Not Disturb
+  access and Modify system settings are switches in Settings: **Allow** opens the page, and
+  **Try again** runs the command when you're back.
+
+## What Android lets an app do
+
+Shuttle uses only what any app may do, without root or Shizuku. Since Android 10 apps can't
+switch Wi-Fi, mobile data or NFC, so those tools open the system's floating panel for that
+setting. Bluetooth on uses the system's confirmation prompt. Bluetooth off, airplane mode,
+location, hotspot and dark theme open their settings pages. Everything else changes directly.
+
+Directions use a standard map link, so they open in whatever maps app you have. Alarms and
+timers are created in your own clock app, which rings them.
+
+## Files
+
+| File | What it is |
+| --- | --- |
+| `MainActivity.kt` | Setup checklist |
+| `assist/AssistActivity.kt` | The assistant panel over other apps |
+| `ui/AssistantPanel.kt` | Conversation, input box and result cards |
+| `ui/AssistantViewModel.kt` | Holds the conversation; runs commands, confirmations and retries |
+| `ui/theme/Theme.kt` | Material 3 Expressive theme with wallpaper colours |
+| `engine/Tools.kt` | Shared types: tool calls, tool descriptions, results, accesses |
+| `engine/ToolSchemas.kt` | Every tool and its arguments; JSON export |
+| `engine/CommandParser.kt` | Fast-path phrasings to tool calls |
+| `engine/Quantities.kt` | Number words, clock times, durations |
+| `tools/*.kt` | The device tools, grouped as above |
+| `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Calls and texts (always confirmed on screen before they go out). -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Finding "Mom" or "Sam" in contacts for calls and texts. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Alarms and timers through the clock app's public intents. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- Needed to show the system "turn on Bluetooth?" prompt on Android 12+. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Do Not Disturb and silent mode; the user grants it in Settings. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Brightness and auto-rotate; the user grants "Modify system settings" in Settings. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- "Open <app>": Android 11+ hides other apps unless we say which ones we look for. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Shuttle">
+
+        <!-- Setup checklist and a place to try commands. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            The assistant panel. Handling ACTION_ASSIST is what makes Shuttle eligible for the
+            Assistant role; once chosen, the assist gesture and long-press of the power or home
+            button open this activity over whatever app is on screen.
+        -->
+        <activity
+            android:name=".assist.AssistActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.shuttle.assistant.assist"
+            android:theme="@style/Theme.Shuttle.Assist"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
