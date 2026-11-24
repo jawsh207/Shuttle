@@ -6,6 +6,15 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,7 +63,8 @@ import app.shuttle.assistant.voice.VoicePrefs
  *
  * Nothing here is required up front. Each tool also asks for its own access the first time
  * it's used; this screen is for granting things ahead of time and checking what's on. Every
- * status is re-read when the user comes back from a system Settings page.
+ * status is re-read when the user comes back from a system Settings page. Each section
+ * collapses from its heading and shows a one-line summary while closed.
  */
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
@@ -70,6 +80,11 @@ fun SettingsScreen(onBack: () -> Unit) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val scrollState = rememberScrollState()
     val voicePrefs = remember { VoicePrefs(context) }
+    // Which sections are open. Outside key(refresh), so returning from Settings keeps them.
+    var assistantOpen by rememberSaveable { mutableStateOf(true) }
+    var permissionsOpen by rememberSaveable { mutableStateOf(true) }
+    var voiceOpen by rememberSaveable { mutableStateOf(true) }
+    var specialOpen by rememberSaveable { mutableStateOf(true) }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -92,26 +107,31 @@ fun SettingsScreen(onBack: () -> Unit) {
             // key(refresh): re-read every status after the user comes back from Settings.
             key(refresh) {
                 val isAssistant = context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_ASSISTANT)
-                Section("Assistant")
-                SetupRow(
-                    title = "Default assistant",
-                    detail = if (isAssistant) {
-                        "Shuttle opens with your assist gesture or a long-press of the power button."
-                    } else {
-                        "Choose Shuttle under Digital assistant app."
-                    },
-                    done = isAssistant,
-                    action = "Choose",
+                Section(
+                    "Assistant",
+                    summary = if (isAssistant) "Shuttle is your digital assistant" else "Not set as your digital assistant",
+                    expanded = assistantOpen,
+                    onToggle = { assistantOpen = !assistantOpen },
                 ) {
-                    // The Assistant role can't be requested with a dialog; the user picks it in Settings.
-                    context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                    SetupRow(
+                        title = "Default assistant",
+                        detail = if (isAssistant) {
+                            "Shuttle opens with your assist gesture or a long-press of the power button."
+                        } else {
+                            "Choose Shuttle under Digital assistant app."
+                        },
+                        done = isAssistant,
+                        action = "Choose",
+                    ) {
+                        // The Assistant role can't be requested with a dialog; the user picks it in Settings.
+                        context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                    }
+                    FilledTonalButton(
+                        onClick = { context.startActivity(Intent(context, AssistActivity::class.java)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Try the assistant panel") }
                 }
-                FilledTonalButton(
-                    onClick = { context.startActivity(Intent(context, AssistActivity::class.java)) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Try the assistant panel") }
 
-                Section("Permissions")
                 val runtime = buildList {
                     add(Access.CONTACTS to "Find people by name for calls and texts.")
                     add(Access.PHONE to "Place calls you've confirmed.")
@@ -120,78 +140,141 @@ fun SettingsScreen(onBack: () -> Unit) {
                         add(Access.NEARBY_DEVICES to "Ask to turn on Bluetooth.")
                     }
                 }
-                for ((access, why) in runtime) {
-                    val granted = context.hasAccess(access)
-                    SetupRow(access.label, why, granted, "Allow") { permissions.launch(access.permissions.toTypedArray()) }
+                Section(
+                    "Permissions",
+                    summary = allowedSummary(runtime.count { context.hasAccess(it.first) }, runtime.size),
+                    expanded = permissionsOpen,
+                    onToggle = { permissionsOpen = !permissionsOpen },
+                ) {
+                    for ((access, why) in runtime) {
+                        SetupRow(access.label, why, context.hasAccess(access), "Allow") {
+                            permissions.launch(access.permissions.toTypedArray())
+                        }
+                    }
                 }
 
-                Section("Voice")
                 val recognizers = VoicePrefs.recognizers(context)
                 val current = VoicePrefs.currentRecognizer(context)
                 val engines = VoicePrefs.ttsEngines(context)
-                SetupRow(
-                    Access.MICROPHONE.label,
-                    "Lets your speech recogniser hear you. Shuttle never records on its own.",
-                    context.hasAccess(Access.MICROPHONE),
-                    "Allow",
-                ) { permissions.launch(Access.MICROPHONE.permissions.toTypedArray()) }
-                SetupRow(
-                    "Speech recogniser",
-                    when {
-                        recognizers.isEmpty() -> "None installed. Install one, such as Distillery, for voice input."
-                        current != null -> "Uses $current. Change voice input in Language & region settings."
-                        else -> "Uses your default voice input, chosen in Language & region settings. " +
-                            "Installed: ${recognizers.joinToString()}."
+                val micOk = context.hasAccess(Access.MICROPHONE)
+                Section(
+                    "Voice",
+                    summary = when {
+                        recognizers.isEmpty() -> "No speech recogniser installed"
+                        !micOk -> "Microphone not allowed yet"
+                        current != null -> "Listens with $current"
+                        else -> "Uses your default voice input"
                     },
-                    done = false,
-                    action = "Settings",
-                ) { context.launch(VoicePrefs.recognizerSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
-                SetupRow(
-                    "Text-to-speech",
-                    if (engines.isEmpty()) "No engine installed, so replies are shown but not spoken."
-                    else "Speaks with your default engine. Installed: ${engines.joinToString()}.",
-                    done = false,
-                    action = "Settings",
-                ) { context.launch(VoicePrefs.ttsSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
-                ToggleRow("Listen when the panel opens", "With the assist gesture, start listening right away instead of showing the keyboard.", voicePrefs.listenOnOpen) {
-                    voicePrefs.listenOnOpen = it
-                    refresh++
-                }
-                ToggleRow("Speak replies", "Read answers aloud when you asked by voice.", voicePrefs.speakReplies) {
-                    voicePrefs.speakReplies = it
-                    refresh++
+                    expanded = voiceOpen,
+                    onToggle = { voiceOpen = !voiceOpen },
+                ) {
+                    SetupRow(
+                        Access.MICROPHONE.label,
+                        "Lets your speech recogniser hear you. Shuttle never records on its own.",
+                        micOk,
+                        "Allow",
+                    ) { permissions.launch(Access.MICROPHONE.permissions.toTypedArray()) }
+                    SetupRow(
+                        "Speech recogniser",
+                        when {
+                            recognizers.isEmpty() -> "None installed. Install one, such as Distillery, for voice input."
+                            current != null -> "Uses $current. Change voice input in Language & region settings."
+                            else -> "Uses your default voice input, chosen in Language & region settings. " +
+                                "Installed: ${recognizers.joinToString()}."
+                        },
+                        done = false,
+                        action = "Settings",
+                    ) { context.launch(VoicePrefs.recognizerSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
+                    SetupRow(
+                        "Text-to-speech",
+                        if (engines.isEmpty()) "No engine installed, so replies are shown but not spoken."
+                        else "Speaks with your default engine. Installed: ${engines.joinToString()}.",
+                        done = false,
+                        action = "Settings",
+                    ) { context.launch(VoicePrefs.ttsSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
+                    ToggleRow("Listen when the panel opens", "With the assist gesture, start listening right away instead of showing the keyboard.", voicePrefs.listenOnOpen) {
+                        voicePrefs.listenOnOpen = it
+                        refresh++
+                    }
+                    ToggleRow("Speak replies", "Read answers aloud when you asked by voice.", voicePrefs.speakReplies) {
+                        voicePrefs.speakReplies = it
+                        refresh++
+                    }
                 }
 
-                Section("Special access")
                 val special = listOf(
                     Access.DO_NOT_DISTURB to "Turn Do Not Disturb and silent mode on and off.",
                     Access.SYSTEM_SETTINGS to "Change brightness and auto-rotate.",
                 )
-                for ((access, why) in special) {
-                    SetupRow(access.label, why, context.hasAccess(access), "Open") {
-                        context.accessSettingsIntent(access)?.let { context.startActivity(it) }
+                Section(
+                    "Special access",
+                    summary = allowedSummary(special.count { context.hasAccess(it.first) }, special.size),
+                    expanded = specialOpen,
+                    onToggle = { specialOpen = !specialOpen },
+                ) {
+                    for ((access, why) in special) {
+                        SetupRow(access.label, why, context.hasAccess(access), "Open") {
+                            context.accessSettingsIntent(access)?.let { context.startActivity(it) }
+                        }
                     }
+                    Text(
+                        "Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app without root, " +
+                            "so Shuttle opens the system panel for you to tap.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    )
                 }
-                Text(
-                    "Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app without root, " +
-                        "so Shuttle opens the system panel for you to tap.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-                )
             }
         }
     }
 }
 
+private fun allowedSummary(allowed: Int, total: Int) = when (allowed) {
+    total -> "All allowed"
+    0 -> "None allowed yet"
+    else -> "$allowed of $total allowed"
+}
+
+/**
+ * A section heading that collapses its rows: tap the heading (or its chevron) to hide or show
+ * them. While collapsed, [summary] says how things stand, so nothing needs opening to check.
+ */
 @Composable
-private fun Section(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 12.dp),
-    )
+private fun Section(
+    title: String,
+    summary: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f, MaterialTheme.motionScheme.defaultEffectsSpec(), label = "chevron")
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClickLabel = if (expanded) "Collapse" else "Expand", onClick = onToggle)
+                .padding(start = 4.dp, top = 12.dp, bottom = 4.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                AnimatedVisibility(visible = !expanded) {
+                    Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Icon(
+                Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(rotation),
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        }
+    }
 }
 
 @Composable

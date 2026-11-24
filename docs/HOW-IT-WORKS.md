@@ -25,7 +25,9 @@ always opens the small panel, never this chat.
 
 The gear opens **Settings** (`ui/SettingsScreen.kt`), sliding in over the chat: a checklist for
 choosing Shuttle as assistant, granting permissions and special accesses, checking the voice
-services and their settings, and a button to try the assistant panel.
+services and their settings, and a button to try the assistant panel. Each section (Assistant,
+Permissions, Voice, Special access) folds away from its heading, and while folded it shows a
+one-line summary such as "3 of 4 allowed".
 
 ## Voice
 
