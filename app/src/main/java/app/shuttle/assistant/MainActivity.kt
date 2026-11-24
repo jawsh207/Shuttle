@@ -129,6 +129,7 @@ private fun SetupScreen() {
 
                 Section("Voice")
                 val recognizers = VoicePrefs.recognizers(context)
+                val current = VoicePrefs.currentRecognizer(context)
                 val engines = VoicePrefs.ttsEngines(context)
                 SetupRow(
                     Access.MICROPHONE.label,
@@ -138,8 +139,12 @@ private fun SetupScreen() {
                 ) { permissions.launch(Access.MICROPHONE.permissions.toTypedArray()) }
                 SetupRow(
                     "Speech recogniser",
-                    if (recognizers.isEmpty()) "None installed. Install one, such as Distillery, for voice input."
-                    else "Uses your default voice input. Installed: ${recognizers.joinToString()}.",
+                    when {
+                        recognizers.isEmpty() -> "None installed. Install one, such as Distillery, for voice input."
+                        current != null -> "Uses $current. Change voice input in Language & region settings."
+                        else -> "Uses your default voice input, chosen in Language & region settings. " +
+                            "Installed: ${recognizers.joinToString()}."
+                    },
                     done = false,
                     action = "Settings",
                 ) { context.launch(VoicePrefs.recognizerSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }

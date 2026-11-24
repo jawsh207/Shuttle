@@ -1,5 +1,6 @@
 package app.shuttle.assistant.voice
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.speech.RecognitionService
@@ -38,8 +39,30 @@ class VoicePrefs(context: Context) {
                 .distinct()
         }
 
-        /** The system page where the default speech recogniser ("voice input") is chosen. */
-        fun recognizerSettings() = Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+        /**
+         * The name of the recogniser Android will use: the user's voice input choice, else the
+         * only one installed. Null when none is installed or several are and the choice can't
+         * be read.
+         */
+        fun currentRecognizer(context: Context): String? {
+            val pm = context.packageManager
+            val chosen = runCatching {
+                // Not a public constant, but it's what the system's voice input setting writes.
+                android.provider.Settings.Secure.getString(context.contentResolver, "voice_recognition_service")
+            }.getOrNull()?.let(ComponentName::unflattenFromString)
+            val pkg = chosen?.packageName
+                ?: pm.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+                    .singleOrNull()?.serviceInfo?.packageName
+                ?: return null
+            return runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrNull()
+        }
+
+        /**
+         * Where the default speech recogniser is chosen: Language & region settings, which hold
+         * "Voice input" on GrapheneOS and AOSP (the same page Dialtone opens). The "voice input"
+         * settings action opens the digital assistant picker instead, so it isn't used.
+         */
+        fun recognizerSettings() = Intent(android.provider.Settings.ACTION_LOCALE_SETTINGS)
 
         /** The system text-to-speech page; no public constant, but present in AOSP and GrapheneOS. */
         fun ttsSettings() = Intent("com.android.settings.TTS_SETTINGS")

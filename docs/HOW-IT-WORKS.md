@@ -35,7 +35,9 @@ as a new request and the card stays on screen, so nothing is sent on a guess. Ty
 go the same way but are never answered aloud.
 
 The two voice settings (listen when the panel opens, speak replies) live in
-`voice/VoicePrefs.kt`, which also lists the installed recognisers and engines for setup.
+`voice/VoicePrefs.kt`, which also lists the installed recognisers and engines for setup and
+shows which recogniser is in use. Setup's button for changing it opens Language & region
+settings, where Android keeps the "Voice input" choice.
 
 ## From words to action
 
