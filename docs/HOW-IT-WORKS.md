@@ -49,8 +49,7 @@ The two voice settings (listen when the panel opens, speak replies) live in
    into one each, with the verb carried over; if any part isn't understood, nothing runs.
    Numbers said as words, clock times and durations are handled by `engine/Quantities.kt`
    ("seven thirty pm", "quarter to seven", "an hour and a half", "a couple of minutes"). An
-   alarm without am/pm
-   ("wake me at 6") goes to whichever 6 o'clock comes next.
+   alarm without am/pm ("wake me at 6") goes to whichever 6 o'clock comes next.
 3. **The result is a tool call**: a tool name and its arguments, such as `set_timer` with
    `seconds = 600`. Every tool and its arguments are listed in `engine/ToolSchemas.kt`, which
    is also exported as [tools.json](tools.json) for a tool-calling model.
