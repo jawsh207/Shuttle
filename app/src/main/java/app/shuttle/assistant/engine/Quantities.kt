@@ -48,6 +48,7 @@ object Quantities {
                     }
                 }
                 w == "oh" && out.lastOrNull()?.all { it.isDigit() } != true -> out += words[i]
+                w == "hundred" && out.lastOrNull() in setOf("a", "1") -> { out.removeAt(out.lastIndex); out += "100" }
                 units[w] != null -> out += units.getValue(w).toString()
                 else -> out += words[i]
             }
@@ -61,7 +62,8 @@ object Quantities {
 
     /**
      * "7", "7:30", "7.30", "730", "7 30", "7 0 5", "7am", "7:30 p.m.", "noon", "midnight",
-     * "7 in the morning", "9 tonight". Returns null when it isn't a time.
+     * "7 in the morning", "9 tonight", "7 o'clock", "half past 6", "quarter to 8",
+     * "6 tomorrow morning". Returns null when it isn't a time.
      */
     fun parseClock(raw: String): Clock? {
         var s = wordsToDigits(raw.lowercase().trim())
@@ -72,13 +74,26 @@ object Quantities {
             "midnight" -> return Clock(0, 0, true)
         }
         var pm: Boolean? = null
-        Regex("\\s*(a\\.?\\s?m\\.?|p\\.?\\s?m\\.?|in the morning|in the afternoon|in the evening|at night|tonight)$")
+        Regex("\\s*(a\\.?\\s?m\\.?|p\\.?\\s?m\\.?|(?:in the|this|tomorrow|every) (?:morning|afternoon|evening)|morning|afternoon|evening|at night|tonight)$")
             .find(s)?.let { m ->
                 val tag = m.groupValues[1]
-                pm = !(tag.startsWith("a") || tag == "in the morning")
+                pm = !(tag.startsWith("a") || tag.endsWith("morning"))
                 s = s.substring(0, m.range.first).trim()
             }
-        s = s.removePrefix("at ").trim()
+        s = s.removePrefix("at ").removePrefix("for ").trim()
+            .replace(Regex("\\s*(?:o'?\\s?clock|sharp|on the dot)$"), "")
+            .trim()
+        // "half past 7", "quarter to 8", "20 past 6", "10 to 9"
+        Regex("^(half|quarter|\\d{1,2})(?: minutes?)? (past|after|to|till|before) (\\d{1,2})$").find(s)?.let { m ->
+            val minutes = when (m.groupValues[1]) { "half" -> 30; "quarter" -> 15; else -> m.groupValues[1].toInt() }
+            val base = m.groupValues[3].toInt()
+            if (minutes !in 1..59 || base !in 0..23) return null
+            s = if (m.groupValues[2] in setOf("past", "after")) {
+                "$base:$minutes"
+            } else {
+                "${(base + 23) % 24}:${60 - minutes}"
+            }
+        }
         val m = Regex("^(\\d{1,2})(?:(?::|\\.|\\s)(\\d{1,2})(?:\\s(\\d))?)?$").find(s)
             ?: Regex("^(\\d{1,2})(\\d{2})$").find(s)
             ?: return null
@@ -121,7 +136,7 @@ object Quantities {
 
     /**
      * "5 minutes", "1 hour 30 minutes", "an hour and a half", "half an hour", "90 seconds",
-     * "2h 15m". Returns seconds, or null.
+     * "2h 15m", "a couple of minutes", "2 and a half hours". Returns seconds, or null.
      */
     fun parseDuration(raw: String): Int? {
         val plain = raw.lowercase().replace(Regex("\\s+"), " ").trim()
@@ -129,8 +144,14 @@ object Quantities {
             return if (plain.endsWith("hour")) 1800 else 30
         }
         var s = wordsToDigits(plain)
+            .replace(Regex("\\b(?:a\\s+)?couple(?:\\s+of)?\\b"), "2")
             .replace(Regex("\\b(an?)\\s+(hour|minute|second)"), "1 $2")
         var extra = 0
+        // "1 and a half hours", "2 and a half minutes"
+        Regex("^(\\d+) and a half (hours?|minutes?)$").find(s)?.let { m ->
+            val unit = if (m.groupValues[2].startsWith("h")) 3600 else 60
+            return m.groupValues[1].toInt() * unit + unit / 2
+        }
         Regex("\\s*and a half$").find(s)?.let { m ->
             val unit = Regex("(hour|minute)s?").findAll(s).lastOrNull()?.groupValues?.get(1)
             extra = if (unit == "hour") 1800 else 30

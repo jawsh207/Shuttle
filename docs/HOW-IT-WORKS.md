@@ -41,10 +41,16 @@ The two voice settings (listen when the panel opens, speak replies) live in
 
 1. **You say or type a command** in the panel (`ui/AssistantPanel.kt`).
 2. **The fast path reads it** (`engine/CommandParser.kt`). It tidies the text ("Hey Shuttle,
-   can you…please" becomes the command itself), then checks it against a list of phrasings
-   such as "turn on X", "call X", "timer for X". Numbers said as words, clock times and
-   durations are handled by `engine/Quantities.kt` ("seven thirty pm", "an hour and a half").
-   An alarm without am/pm ("wake me at 6") goes to whichever 6 o'clock comes next.
+   um, can you…please" becomes the command itself), then checks it against a list of
+   phrasings. Each command has many: switching Wi-Fi off can be "turn off wifi", "kill the
+   wifi", "shut the wifi off" or "wifi off"; turning brightness up can be "brighter" or "the
+   screen is too dark". Message text is read exactly as said, so a text ending in "thanks" or
+   "now" keeps it. A sentence with several commands ("turn off wifi and bluetooth") is split
+   into one each, with the verb carried over; if any part isn't understood, nothing runs.
+   Numbers said as words, clock times and durations are handled by `engine/Quantities.kt`
+   ("seven thirty pm", "quarter to seven", "an hour and a half", "a couple of minutes"). An
+   alarm without am/pm
+   ("wake me at 6") goes to whichever 6 o'clock comes next.
 3. **The result is a tool call**: a tool name and its arguments, such as `set_timer` with
    `seconds = 600`. Every tool and its arguments are listed in `engine/ToolSchemas.kt`, which
    is also exported as [tools.json](tools.json) for a tool-calling model.
@@ -58,7 +64,9 @@ The two voice settings (listen when the panel opens, speak replies) live in
 5. **A card shows what happened** (`ui/AssistantPanel.kt`). The conversation itself is kept by
    `ui/AssistantViewModel.kt`.
 
-If the fast path doesn't recognise the command, the panel says it can't do that yet. That's
+If the fast path doesn't recognise the command, `engine/SmallTalk.kt` checks for the social
+things people say (hello, thanks, "what can you do?", "never mind", which closes the panel).
+Anything else gets "I can't do that yet". That's
 where the on-device model will go.
 
 ## Cards that need you
@@ -99,5 +107,6 @@ timers are created in your own clock app, which rings them.
 | `engine/ToolSchemas.kt` | Every tool and its arguments; JSON export |
 | `engine/CommandParser.kt` | Fast-path phrasings to tool calls |
 | `engine/Quantities.kt` | Number words, clock times, durations |
+| `engine/SmallTalk.kt` | Replies to hello, thanks, "what can you do?", "never mind" |
 | `tools/*.kt` | The device tools, grouped as above |
 | `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |

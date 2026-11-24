@@ -23,9 +23,19 @@ device; nothing is sent anywhere.
 | Screen | "brightness 40%", "dim the screen", "auto-rotate off", "adaptive brightness on" |
 | Media | "play", "pause the music", "next track", "volume up", "set volume to 30" |
 | Calls and texts | "call Mom", "dial 555 123 4567", "text Sam saying I'm running late" |
-| Clock | "set an alarm for 7:30", "wake me up at 6", "timer 10 minutes" |
+| Clock | "set an alarm for 7:30", "wake me up at quarter to 7", "timer 10 minutes", "remind me in 5 minutes" |
 | Apps and places | "open camera", "navigate to the library" |
 | Status | "battery", "what time is it", "what's the date" |
+
+These are only examples: each command understands many everyday wordings ("kill the wifi",
+"it's too bright", "make it louder", "let Sam know I'm late", "wake me up at half past six",
+"remind me in 10 minutes", "where's the nearest pharmacy"), and ignores hesitations and polite
+extras ("um, could you… please"). Several commands can go in one sentence: "turn off wifi and
+bluetooth", "set an alarm for 7 and a timer for 10 minutes". Shuttle only acts when it
+understands every part.
+
+It also answers the social things people say: hello, thanks, "what can you do?", and "never
+mind" (which closes the panel).
 
 Calls and texts always show who and what first and wait for you to tap **Call** or **Send**,
 or to say yes or no.

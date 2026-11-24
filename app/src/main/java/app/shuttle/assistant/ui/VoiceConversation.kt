@@ -50,15 +50,25 @@ class VoiceConversation(
 
     fun submit(text: String, spoken: Boolean) {
         hint = null
-        after(vm.submit(context, text), spoken)
+        val from = vm.exchanges.size
+        after(vm.submit(context, text), spoken, from)
     }
 
-    fun confirm(exchange: AssistantViewModel.Exchange) = after(vm.confirm(context, exchange), spoken = false)
+    fun confirm(exchange: AssistantViewModel.Exchange) {
+        val from = vm.exchanges.size
+        after(vm.confirm(context, exchange), spoken = false, from)
+    }
 
-    fun retry(exchange: AssistantViewModel.Exchange) = after(vm.retry(context, exchange), spoken = false)
+    fun retry(exchange: AssistantViewModel.Exchange) {
+        val from = vm.exchanges.size
+        after(vm.retry(context, exchange), spoken = false, from)
+    }
 
-    /** Decide what follows a result: close, speak it, and listen for a yes/no if it asks one. */
-    private fun after(closePanel: Boolean, spoken: Boolean) {
+    /**
+     * Decide what follows the results added since index [from]: close, speak them, and listen
+     * for a yes/no if the last one asks one.
+     */
+    private fun after(closePanel: Boolean, spoken: Boolean, from: Int) {
         if (closePanel) {
             // Another app or screen is opening; it's the answer.
             voice?.stopSpeaking()
@@ -66,11 +76,11 @@ class VoiceConversation(
             return
         }
         if (!spoken || voice == null) return
-        val last = vm.exchanges.lastOrNull() ?: return
-        val result = last.result
-        val waitForAnswer = result is ToolResult.Confirm && !last.settled
+        val added = vm.exchanges.drop(from)
+        val last = added.lastOrNull() ?: return
+        val waitForAnswer = last.result is ToolResult.Confirm && !last.settled
         val next: () -> Unit = { if (waitForAnswer) listenForAnswer(last.id) }
-        if (speakReplies) voice.speak(speechFor(result), next) else next()
+        if (speakReplies) voice.speak(added.joinToString(" ") { speechFor(it.result) }, next) else next()
     }
 
     private fun listenForAnswer(id: Int) {
@@ -82,10 +92,14 @@ class VoiceConversation(
                 when {
                     exchange == null -> submit(said, spoken = true)
                     else -> when (Replies.yesNo(said)) {
-                        Replies.Answer.YES -> after(vm.confirm(context, exchange), spoken = true)
+                        Replies.Answer.YES -> {
+                            val from = vm.exchanges.size
+                            after(vm.confirm(context, exchange), spoken = true, from)
+                        }
                         Replies.Answer.NO -> {
+                            val from = vm.exchanges.size
                             vm.cancel(exchange)
-                            after(false, spoken = true)
+                            after(false, spoken = true, from)
                         }
                         null -> submit(said, spoken = true)
                     }

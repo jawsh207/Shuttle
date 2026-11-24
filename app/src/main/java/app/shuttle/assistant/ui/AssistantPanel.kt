@@ -202,8 +202,8 @@ private fun ExchangeView(
     onRetry: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        // What was asked, as a bubble on the right.
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        // What was asked, as a bubble on the right (once, for a multi-part request).
+        if (exchange.asked.isNotEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp),
