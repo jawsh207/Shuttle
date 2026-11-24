@@ -11,7 +11,11 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Needed to show the system "turn on Bluetooth?" prompt on Android 12+. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- Downloading the on-device model (once, through Android's download manager) and
+    <!-- The model download runs as a foreground service with a progress notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Downloading the on-device model (once, by Shuttle itself) and
          checking models/manifest.json on GitHub for model updates. Nothing else uses the
          network: every request is handled on the phone. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -82,5 +86,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Downloads the model in the background (llm/ModelDownloadService.kt). -->
+        <service
+            android:name=".llm.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

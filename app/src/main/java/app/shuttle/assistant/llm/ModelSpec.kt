@@ -54,6 +54,13 @@ data class ModelSpec(
             }
         }.getOrNull()
 
+        fun encode(spec: ModelSpec): String = JSONObject().put(
+            "model",
+            JSONObject()
+                .put("id", spec.id).put("name", spec.name).put("format", spec.format).put("url", spec.url)
+                .put("sha256", spec.sha256).put("size", spec.size).put("license", spec.license),
+        ).toString()
+
         fun parse(json: String): ModelSpec? = runCatching {
             val m = JSONObject(json).getJSONObject("model")
             ModelSpec(

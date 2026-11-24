@@ -161,9 +161,12 @@ class AssistantViewModel : ViewModel() {
         val examples = "Phone commands like \"flashlight on\" or \"timer 5 minutes\" work now; ask \"what can you do?\" for more."
         return when (val s = ModelManager.state) {
             is ModelManager.State.Downloading -> "The model is still downloading (${s.percent}%). Until it's ready I can't chat or answer questions. $examples"
-            ModelManager.State.WaitingForWifi -> "The model download is waiting for Wi-Fi. Until it's ready I can't chat or answer questions. $examples"
+            is ModelManager.State.WaitingForWifi -> "The model download is waiting for Wi-Fi. Until it's ready I can't chat or answer questions. $examples"
+            is ModelManager.State.WaitingForNetwork -> "The model download is waiting for a connection. Until it's ready I can't chat or answer questions. $examples"
             ModelManager.State.Checking -> "The model has downloaded and is being checked. Try again in a moment."
-            is ModelManager.State.Failed -> "The model download didn't finish. Try again in Settings › Model. $examples"
+            is ModelManager.State.Failed ->
+                if (s.networkBlocked) "The model can't download because Shuttle isn't allowed to use the network. Turn on its Network permission in App info, then try again in Settings › Model. $examples"
+                else "The model download didn't finish. Try again in Settings › Model. $examples"
             else -> "I need the model for that. Download it in Settings › Model (${ModelManager.current.sizeLabel}, once) so I can chat and answer questions. $examples"
         }
     }

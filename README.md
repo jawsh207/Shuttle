@@ -73,8 +73,13 @@ Anything the commands above don't cover (questions, conversation, unusual wordin
 limit, and nothing you ask leaves the phone.
 
 - **Download once:** Settings › Model › Download (2.2 GB, Wi-Fi only by default). It continues
-  with Shuttle closed and shows progress in the notification shade. Until then, phone commands
+  with Shuttle closed, shows progress in the notification shade, resumes after a dropped
+  connection, and pauses on mobile data while "Wi-Fi only" is on. Until then, phone commands
   work and other requests get a short note saying the model isn't downloaded yet.
+- **GrapheneOS Network permission:** GrapheneOS asks about network access only when an app is
+  first installed; an update that adds it (like this one) starts with it off, and there's no
+  prompt an app can show. If it's off, Settings › Model says so and opens App info, where it's
+  under Permissions › Network.
 - **Checked before use:** the download's SHA-256 must match the one in
   [models/manifest.json](models/manifest.json); anything else is deleted.
 - **Updates:** the project chooses the model in `models/manifest.json`. When it changes,
@@ -123,8 +128,9 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
-| Internet (granted at install; GrapheneOS can turn it off) | Downloading the model once, and checking `models/manifest.json` for model updates. Requests never go online |
+| Internet (GrapheneOS: the Network permission in App info) | Downloading the model once, and checking `models/manifest.json` for model updates. Requests never go online |
 | Wi-Fi and network state (granted at install) | Answering "is Wi-Fi on?" and "is mobile data on?" |
+| Notifications (Android 13+, asked when you tap Download) | Showing the model download's progress |
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
 | Modify system settings (special) | Brightness and auto-rotate |

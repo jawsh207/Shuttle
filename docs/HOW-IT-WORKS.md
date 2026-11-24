@@ -105,11 +105,15 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
 - **Loading and memory.** `llm/LocalModel.kt` loads the model the first time a request needs it
   (a few seconds), runs one reply at a time on a background thread, and frees the memory (about
   3 GB) after five quiet minutes. The conversation is capped at 8,000 tokens.
-- **Getting the model.** `llm/ModelManager.kt` downloads it with Android's download manager:
-  only when the user taps Download, Wi-Fi only by default, continuing with Shuttle closed. The
-  finished file's SHA-256 has to match the one in `models/manifest.json` or it's deleted. The
-  app checks that manifest on GitHub for a newer model and offers it in Settings; a copy of the
-  current choice is built in (`llm/ModelSpec.kt`).
+- **Getting the model.** `llm/ModelManager.kt` keeps track of it and `llm/ModelDownloadService.kt`
+  downloads it, only when the user taps Download. Shuttle downloads it itself, as a background
+  service with a progress notification, rather than handing it to Android's system downloader:
+  that way "Wi-Fi only" applies immediately (on mobile data it pauses and waits), a dropped
+  connection resumes where it stopped, and if the phone is online but Shuttle's Network
+  permission is off (GrapheneOS only asks for it when an app is first installed), it says so
+  and offers App info. The finished file's SHA-256 has to match the one in
+  `models/manifest.json` or it's deleted. The app checks that manifest on GitHub for a newer
+  model and offers it in Settings; a copy of the current choice is built in (`llm/ModelSpec.kt`).
 - **Talking to it.** `llm/GranitePrompt.kt` writes the conversation in Granite's own format
   (from its published chat template, with thinking off so answers start straight away) and
   reads tool calls out of the reply. `llm/ModelPrompts.kt` holds the instructions it's given:
@@ -151,7 +155,8 @@ timers are created in your own clock app, which rings them.
 | `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
 | `llm/LlamaEngine.kt` | Kotlin side of the native bridge to llama.cpp |
 | `llm/LocalModel.kt` | Loads the model when needed, streams replies, unloads when idle |
-| `llm/ModelManager.kt` | Downloads, checks, updates and deletes the model |
+| `llm/ModelManager.kt` | The model's state: download, check, install, update, delete |
+| `llm/ModelDownloadService.kt` | Background download with progress notification, resume and Wi-Fi rule |
 | `llm/ModelSpec.kt` | Which model, where from, its checksum; reads `models/manifest.json` |
 | `llm/GranitePrompt.kt` | Granite's prompt format and tool-call reading |
 | `llm/ModelPrompts.kt` | The model's instructions, its tools, and the argument safety check |

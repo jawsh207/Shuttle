@@ -287,7 +287,8 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
 
 /**
  * The model: what it is, whether it's downloaded, and the download itself. State comes from
- * [ModelManager], so progress moves on its own.
+ * [ModelManager], so progress moves on its own. Tapping Download asks to show notifications
+ * first (Android 13+) so the progress notification appears; the download runs either way.
  */
 @Composable
 private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onChanged: () -> Unit) {
@@ -295,12 +296,28 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
     val state = ModelManager.state
     val spec = ModelManager.current
     val update = ModelManager.update
+    var pendingSpec by remember { mutableStateOf<app.shuttle.assistant.llm.ModelSpec?>(null) }
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        pendingSpec?.let { ModelManager.download(context, it) }
+        pendingSpec = null
+    }
+    fun download(which: app.shuttle.assistant.llm.ModelSpec = spec) {
+        val needsAsk = Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (needsAsk) {
+            pendingSpec = which
+            notify.launch("android.permission.POST_NOTIFICATIONS")
+        } else {
+            ModelManager.download(context, which)
+        }
+    }
     val summary = when (state) {
         is ModelManager.State.Ready -> if (update != null) "Update available" else "${state.spec.name} is ready"
         is ModelManager.State.Downloading -> "Downloading, ${state.percent}%"
-        ModelManager.State.WaitingForWifi -> "Waiting for Wi-Fi"
+        is ModelManager.State.WaitingForWifi -> "Waiting for Wi-Fi"
+        is ModelManager.State.WaitingForNetwork -> "Waiting for a connection"
         ModelManager.State.Checking -> "Checking the download"
-        is ModelManager.State.Failed -> "Download didn't finish"
+        is ModelManager.State.Failed -> if (state.networkBlocked) "Network permission is off" else "Download didn't finish"
         ModelManager.State.Missing -> "Not downloaded"
     }
     Section("Model", summary = summary, expanded = expanded, onToggle = onToggle) {
@@ -318,44 +335,67 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val small = MaterialTheme.typography.bodySmall
                 when (state) {
                     is ModelManager.State.Downloading -> {
                         LinearWavyProgressIndicator(progress = { state.percent / 100f }, modifier = Modifier.fillMaxWidth())
-                        Text("${state.percent}% · continues with Shuttle closed", style = MaterialTheme.typography.bodySmall)
+                        Text("${state.percent}% · continues with Shuttle closed", style = small)
                         OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
                     }
-                    ModelManager.State.WaitingForWifi -> {
-                        Text("Waiting for Wi-Fi. Turn off \"Wi-Fi only\" below to use mobile data.", style = MaterialTheme.typography.bodySmall)
+                    is ModelManager.State.WaitingForWifi -> {
+                        LinearWavyProgressIndicator(progress = { percent(state.done, state.total) }, modifier = Modifier.fillMaxWidth())
+                        Text("Paused until you're on Wi-Fi. Turn off \"Wi-Fi only\" below to use mobile data now.", style = small)
+                        OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
+                    }
+                    is ModelManager.State.WaitingForNetwork -> {
+                        LinearWavyProgressIndicator(progress = { percent(state.done, state.total) }, modifier = Modifier.fillMaxWidth())
+                        Text("Waiting for a connection; it picks up where it stopped.", style = small)
                         OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
                     }
                     ModelManager.State.Checking -> {
                         LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        Text("Checking the download…", style = MaterialTheme.typography.bodySmall)
+                        Text("Checking the download…", style = small)
                     }
                     is ModelManager.State.Ready -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (update != null) {
-                            Button(onClick = { ModelManager.download(context, update) }) { Text("Update (${update.sizeLabel})") }
+                            Button(onClick = { download(update) }) { Text("Update (${update.sizeLabel})") }
                         }
                         OutlinedButton(onClick = onDelete) { Text("Delete") }
                     }
                     is ModelManager.State.Failed -> {
-                        Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        Button(onClick = { ModelManager.download(context) }) { Text("Try again") }
+                        Text(state.message, style = small, color = MaterialTheme.colorScheme.error)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (state.networkBlocked) {
+                                Button(onClick = { context.startActivity(ModelManager.appInfoIntent(context)) }) { Text("App info") }
+                                OutlinedButton(onClick = { download() }) { Text("Try again") }
+                            } else {
+                                Button(onClick = { download() }) { Text("Try again") }
+                            }
+                        }
                     }
-                    ModelManager.State.Missing -> Button(onClick = { ModelManager.download(context) }) { Text("Download (${spec.sizeLabel})") }
+                    ModelManager.State.Missing -> Button(onClick = { download() }) { Text("Download (${spec.sizeLabel})") }
                 }
             }
         }
         ToggleRow(
             "Wi-Fi only",
-            "Download the model only over Wi-Fi. Applies to the next download.",
-            ModelManager.wifiOnly(context),
+            "Download the model only over Wi-Fi. Takes effect right away, even mid-download.",
+            ModelManager.wifiOnly,
         ) {
             ModelManager.setWifiOnly(context, it)
             onChanged()
         }
+        Text(
+            "On GrapheneOS, the download needs Shuttle's Network permission (App info › Permissions). " +
+                "It's only used for the model; requests never leave the phone.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 }
+
+private fun percent(done: Long, total: Long) = if (total > 0) done.toFloat() / total else 0f
 
 private fun allowedSummary(allowed: Int, total: Int) = when (allowed) {
     total -> "All allowed"

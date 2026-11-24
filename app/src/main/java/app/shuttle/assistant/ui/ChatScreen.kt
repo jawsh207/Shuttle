@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.llm.ModelManager
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
@@ -204,16 +205,25 @@ private fun ModelNotice() {
     val text = when (state) {
         is ModelManager.State.Ready -> return
         is ModelManager.State.Downloading -> "Downloading the model, ${state.percent}%. Phone commands work in the meantime."
-        ModelManager.State.WaitingForWifi -> "The model download is waiting for Wi-Fi."
+        is ModelManager.State.WaitingForWifi -> "The model download is waiting for Wi-Fi."
+        is ModelManager.State.WaitingForNetwork -> "The model download is waiting for a connection."
         ModelManager.State.Checking -> "Checking the model download…"
-        is ModelManager.State.Failed, ModelManager.State.Missing ->
+        is ModelManager.State.Failed ->
+            if (state.networkBlocked) "Shuttle isn't allowed to use the network, so the model can't download. Turn on its Network permission in App info."
+            else "The model download didn't finish. Phone commands work now."
+        ModelManager.State.Missing ->
             "Phone commands work now. For chat and questions, download the model (${ModelManager.current.sizeLabel}, once)."
     }
     Spacer(Modifier.height(24.dp))
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceBright) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(text, style = MaterialTheme.typography.bodyMedium)
-            if (state is ModelManager.State.Missing || state is ModelManager.State.Failed) {
+            if (state is ModelManager.State.Failed && state.networkBlocked) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { context.startActivity(ModelManager.appInfoIntent(context)) }) { Text("App info") }
+                    OutlinedButton(onClick = { ModelManager.download(context) }) { Text("Try again") }
+                }
+            } else if (state is ModelManager.State.Missing || state is ModelManager.State.Failed) {
                 Button(onClick = { ModelManager.download(context) }) { Text("Download") }
             }
         }
