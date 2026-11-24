@@ -51,7 +51,8 @@ class VoiceConversation(
     fun submit(text: String, spoken: Boolean) {
         hint = null
         val from = vm.exchanges.size
-        after(vm.submit(context, text), spoken, from)
+        // A model reply finishes later, so what happens next waits for it.
+        vm.submit(context, text) { close -> after(close, spoken, from) }
     }
 
     fun confirm(exchange: AssistantViewModel.Exchange) {

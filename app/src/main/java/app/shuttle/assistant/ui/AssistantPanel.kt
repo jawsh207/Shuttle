@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -102,6 +103,7 @@ fun AssistantPanel(
     talk.requestMic = { mic.launch(Access.MICROPHONE.permissions.first()) }
 
     fun send() {
+        if (vm.thinking) return // keep what's typed until the current reply is done
         val text = input
         input = ""
         if (text.isNotBlank()) talk.submit(text, spoken = false)
@@ -187,6 +189,9 @@ fun AssistantPanel(
                 modifier = Modifier.weight(1f).focusRequester(focus),
             )
             when {
+                vm.thinking -> FilledIconButton(onClick = { vm.stopThinking() }) {
+                    Icon(Icons.Rounded.Stop, contentDescription = "Stop")
+                }
                 input.isNotBlank() -> FilledIconButton(onClick = { send() }) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                 }
@@ -250,8 +255,13 @@ private fun ResultCard(
     }
     Card(colors = colors, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(result.text, style = MaterialTheme.typography.bodyLarge)
-            if (!exchange.settled) {
+            if (exchange.thinking && result.text.isBlank()) {
+                // The model is reading the request; text appears as it's written.
+                LoadingIndicator(Modifier.size(36.dp))
+            } else {
+                Text(result.text, style = MaterialTheme.typography.bodyLarge)
+            }
+            if (!exchange.settled && !exchange.thinking) {
                 when (result) {
                     is ToolResult.Confirm -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = onConfirm) { Text(result.confirmLabel) }

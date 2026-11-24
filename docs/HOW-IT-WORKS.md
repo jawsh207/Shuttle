@@ -33,7 +33,8 @@ text and can never be acted on later. The assist panel's quick commands aren't s
 
 The gear opens **Settings** (`ui/SettingsScreen.kt`), sliding in over the chat: a checklist for
 choosing Shuttle as assistant, granting permissions and special accesses, checking the voice
-services and their settings, a Chats section for turning saving off or deleting every chat,
+services and their settings, a Model section for downloading, updating or deleting the
+model, a Chats section for turning saving off or deleting every chat,
 and a button to try the assistant panel. Each section (Assistant, Permissions, Voice, Chats,
 Special access) folds away from its heading, and while folded it shows a
 one-line summary such as "3 of 4 allowed".
@@ -90,8 +91,36 @@ settings, where Android keeps the "Voice input" choice.
 
 If the fast path doesn't recognise the command, `engine/SmallTalk.kt` checks for the social
 things people say (hello, thanks, "what can you do?", "never mind", which closes the panel).
-Anything else gets "I can't do that yet". That's
-where the on-device model will go.
+Anything else goes to the on-device model (next section).
+
+## The on-device model
+
+Shuttle's model is IBM's Granite 4.2 3B, running on the phone through llama.cpp. It handles
+whatever the fast path doesn't: questions, conversation, unusual wordings, follow-ups.
+
+- **The engine.** llama.cpp is part of the app (a git submodule at `app/src/main/cpp/llama.cpp`,
+  pinned to a release). `app/src/main/cpp/shuttle_llm.cpp` is a small bridge that loads a model,
+  runs a prompt and streams the reply back; `llm/LlamaEngine.kt` is its Kotlin side. Each turn
+  re-uses what the model already read last time, so long chats stay quick.
+- **Loading and memory.** `llm/LocalModel.kt` loads the model the first time a request needs it
+  (a few seconds), runs one reply at a time on a background thread, and frees the memory (about
+  3 GB) after five quiet minutes. The conversation is capped at 8,000 tokens.
+- **Getting the model.** `llm/ModelManager.kt` downloads it with Android's download manager:
+  only when the user taps Download, Wi-Fi only by default, continuing with Shuttle closed. The
+  finished file's SHA-256 has to match the one in `models/manifest.json` or it's deleted. The
+  app checks that manifest on GitHub for a newer model and offers it in Settings; a copy of the
+  current choice is built in (`llm/ModelSpec.kt`).
+- **Talking to it.** `llm/GranitePrompt.kt` writes the conversation in Granite's own format
+  (from its published chat template, with thinking off so answers start straight away) and
+  reads tool calls out of the reply. `llm/ModelPrompts.kt` holds the instructions it's given:
+  short answers, use the phone's tools for actions, and say it can't go online rather than
+  guess. It's offered exactly the tools in `docs/tools.json`.
+- **Doing things.** When the model asks for a tool, the call runs through the same device tools
+  as a typed command. Arguments the tool doesn't declare are thrown away first, so the model
+  can't mark a call or text as already confirmed: those always stop at the confirmation card.
+- **On screen.** The reply streams into its card as it's written; a stop button replaces send
+  until it's done. Before the model is downloaded, the empty chat offers the download, and
+  other requests get a short note saying so.
 
 ## Cards that need you
 
@@ -120,6 +149,14 @@ timers are created in your own clock app, which rings them.
 | --- | --- |
 | `MainActivity.kt` | Launcher entry: the full-screen chat, with Settings over it |
 | `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
+| `llm/LlamaEngine.kt` | Kotlin side of the native bridge to llama.cpp |
+| `llm/LocalModel.kt` | Loads the model when needed, streams replies, unloads when idle |
+| `llm/ModelManager.kt` | Downloads, checks, updates and deletes the model |
+| `llm/ModelSpec.kt` | Which model, where from, its checksum; reads `models/manifest.json` |
+| `llm/GranitePrompt.kt` | Granite's prompt format and tool-call reading |
+| `llm/ModelPrompts.kt` | The model's instructions, its tools, and the argument safety check |
+| `app/src/main/cpp/shuttle_llm.cpp` | Native bridge: load, generate, free |
+| `models/manifest.json` | The project's current model choice, read by the app |
 | `chats/ChatStore.kt` | Saved chats: one private text file each; listing, search, delete |
 | `chats/ChatPrefs.kt` | Whether chats are saved |
 | `ui/SettingsScreen.kt` | Assistant role, permissions, special access and voice settings |

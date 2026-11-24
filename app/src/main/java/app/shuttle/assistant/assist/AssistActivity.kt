@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.tools.DeviceTools
 import app.shuttle.assistant.ui.AssistantPanel
 import app.shuttle.assistant.ui.AssistantViewModel
@@ -56,6 +57,7 @@ class AssistActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DeviceTools.prepare(this)
+        ModelManager.start(this)
         val prefs = VoicePrefs(this)
         val session = VoiceSession(this).also { voice = it }
         // Listen on open only for a fresh panel, not when it's recreated after rotation.

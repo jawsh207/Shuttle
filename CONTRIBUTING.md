@@ -32,6 +32,17 @@ Every change keeps the code readable by someone who didn't write it.
    in the result text.
 6. Anything that contacts a person or spends money (calls, texts) returns a confirmation first.
 
+## The model
+
+- The model is chosen by the project in `models/manifest.json` (id, URL, SHA-256, size,
+  licence). Changing it there offers the update to every user; also update `ModelSpec.BUILT_IN`
+  to match. Only Apache-2.0 or compatible models.
+- llama.cpp is a submodule pinned to a release. To update it, check out the new release tag in
+  `app/src/main/cpp/llama.cpp`, fix `shuttle_llm.cpp` for any API changes, and commit the new
+  pointer.
+- If a new model uses a different prompt format, give it its own file like
+  `llm/GranitePrompt.kt` with tests, rather than changing Granite's.
+
 ## Tests
 
 Unit tests live in `app/src/test/` and run on every build (`./gradlew testDebugUnitTest`);

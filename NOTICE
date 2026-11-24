@@ -11,3 +11,11 @@ Copyright 2015 The Google Sans Flex Authors (https://github.com/googlefonts/goog
 Licensed under the SIL Open Font License, Version 1.1. The full license ships inside the app
 at assets/licenses/google_sans_flex-OFL.txt and is in this repository at
 app/src/main/assets/licenses/google_sans_flex-OFL.txt.
+
+llama.cpp (app/src/main/cpp/llama.cpp, a git submodule)
+Copyright (c) 2023-2026 The ggml authors (https://github.com/ggml-org/llama.cpp)
+Licensed under the MIT License; see app/src/main/cpp/llama.cpp/LICENSE.
+
+The language model (IBM Granite 4.2 3B, GGUF) is not part of this repository or the app. It is
+downloaded on request from https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF and is
+licensed by IBM under the Apache License, Version 2.0.

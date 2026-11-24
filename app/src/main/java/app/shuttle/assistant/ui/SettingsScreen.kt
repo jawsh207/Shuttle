@@ -34,7 +34,9 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -55,6 +57,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.shuttle.assistant.assist.AssistActivity
 import app.shuttle.assistant.chats.ChatPrefs
 import app.shuttle.assistant.engine.Access
+import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.tools.accessSettingsIntent
 import app.shuttle.assistant.tools.hasAccess
 import app.shuttle.assistant.tools.launch
@@ -67,8 +70,9 @@ import app.shuttle.assistant.voice.VoicePrefs
  * Nothing here is required up front. Each tool also asks for its own access the first time
  * it's used; this screen is for granting things ahead of time and checking what's on. Every
  * status is re-read when the user comes back from a system Settings page. Each section
- * collapses from its heading and shows a one-line summary while closed. The Chats section
- * turns saving off and deletes every saved chat.
+ * collapses from its heading and shows a one-line summary while closed. The Model section
+ * downloads, updates and deletes the on-device model; the Chats section turns saving off and
+ * deletes every saved chat.
  */
 @Composable
 fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: () -> Unit) {
@@ -90,6 +94,19 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
     var voiceOpen by rememberSaveable { mutableStateOf(true) }
     var specialOpen by rememberSaveable { mutableStateOf(true) }
     var chatsOpen by rememberSaveable { mutableStateOf(true) }
+    var modelOpen by rememberSaveable { mutableStateOf(true) }
+    var confirmDeleteModel by rememberSaveable { mutableStateOf(false) }
+    if (confirmDeleteModel) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteModel = false },
+            title = { Text("Delete the model?") },
+            text = { Text("Chat and questions stop working until it's downloaded again. Phone commands keep working.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDeleteModel = false; ModelManager.delete(context) }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteModel = false }) { Text("Cancel") } },
+        )
+    }
     var confirmDeleteAll by rememberSaveable { mutableStateOf(false) }
     if (confirmDeleteAll) {
         AlertDialog(
@@ -148,6 +165,8 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Try the assistant panel") }
                 }
+
+                ModelSection(modelOpen, onToggle = { modelOpen = !modelOpen }, onDelete = { confirmDeleteModel = true }) { refresh++ }
 
                 val runtime = buildList {
                     add(Access.CONTACTS to "Find people by name for calls and texts.")
@@ -262,6 +281,78 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The model: what it is, whether it's downloaded, and the download itself. State comes from
+ * [ModelManager], so progress moves on its own.
+ */
+@Composable
+private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val state = ModelManager.state
+    val spec = ModelManager.current
+    val update = ModelManager.update
+    val summary = when (state) {
+        is ModelManager.State.Ready -> if (update != null) "Update available" else "${state.spec.name} is ready"
+        is ModelManager.State.Downloading -> "Downloading, ${state.percent}%"
+        ModelManager.State.WaitingForWifi -> "Waiting for Wi-Fi"
+        ModelManager.State.Checking -> "Checking the download"
+        is ModelManager.State.Failed -> "Download didn't finish"
+        ModelManager.State.Missing -> "Not downloaded"
+    }
+    Section("Model", summary = summary, expanded = expanded, onToggle = onToggle) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val shown = (state as? ModelManager.State.Ready)?.spec ?: spec
+                Text(shown.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Runs on this phone for chat and questions; phone commands never need it. " +
+                        "${shown.sizeLabel}, downloaded once. ${shown.license} license.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                when (state) {
+                    is ModelManager.State.Downloading -> {
+                        LinearWavyProgressIndicator(progress = { state.percent / 100f }, modifier = Modifier.fillMaxWidth())
+                        Text("${state.percent}% · continues with Shuttle closed", style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
+                    }
+                    ModelManager.State.WaitingForWifi -> {
+                        Text("Waiting for Wi-Fi. Turn off \"Wi-Fi only\" below to use mobile data.", style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
+                    }
+                    ModelManager.State.Checking -> {
+                        LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text("Checking the download…", style = MaterialTheme.typography.bodySmall)
+                    }
+                    is ModelManager.State.Ready -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (update != null) {
+                            Button(onClick = { ModelManager.download(context, update) }) { Text("Update (${update.sizeLabel})") }
+                        }
+                        OutlinedButton(onClick = onDelete) { Text("Delete") }
+                    }
+                    is ModelManager.State.Failed -> {
+                        Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        Button(onClick = { ModelManager.download(context) }) { Text("Try again") }
+                    }
+                    ModelManager.State.Missing -> Button(onClick = { ModelManager.download(context) }) { Text("Download (${spec.sizeLabel})") }
+                }
+            }
+        }
+        ToggleRow(
+            "Wi-Fi only",
+            "Download the model only over Wi-Fi. Applies to the next download.",
+            ModelManager.wifiOnly(context),
+        ) {
+            ModelManager.setWifiOnly(context, it)
+            onChanged()
         }
     }
 }

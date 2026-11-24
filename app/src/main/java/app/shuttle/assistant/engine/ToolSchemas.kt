@@ -101,27 +101,26 @@ object ToolSchemas {
     fun find(name: String): ToolSpec? = all.firstOrNull { it.name == name }
 
     /** The tool list as a JSON array in the common function-calling format. */
-    fun toJson(specs: List<ToolSpec> = all): String = buildString {
-        append("[\n")
-        specs.forEachIndexed { i, spec ->
-            append("  {\"name\": ").append(quote(spec.name))
-            append(", \"description\": ").append(quote(spec.description))
-            append(", \"parameters\": {\"type\": \"object\", \"properties\": {")
-            spec.params.forEachIndexed { j, p ->
-                if (j > 0) append(", ")
-                append(quote(p.name)).append(": {\"type\": ").append(quote(p.type.json))
-                append(", \"description\": ").append(quote(p.description))
-                if (p.options.isNotEmpty()) {
-                    append(", \"enum\": [").append(p.options.joinToString(", ") { quote(it) }).append("]")
-                }
-                append("}")
+    fun toJson(specs: List<ToolSpec> = all): String =
+        specs.joinToString(separator = ",\n", prefix = "[\n", postfix = "\n]\n") { "  " + toolJson(it) }
+
+    /** One tool as a single-line JSON object: `{"name": …, "description": …, "parameters": …}`. */
+    fun toolJson(spec: ToolSpec): String = buildString {
+        append("{\"name\": ").append(quote(spec.name))
+        append(", \"description\": ").append(quote(spec.description))
+        append(", \"parameters\": {\"type\": \"object\", \"properties\": {")
+        spec.params.forEachIndexed { j, p ->
+            if (j > 0) append(", ")
+            append(quote(p.name)).append(": {\"type\": ").append(quote(p.type.json))
+            append(", \"description\": ").append(quote(p.description))
+            if (p.options.isNotEmpty()) {
+                append(", \"enum\": [").append(p.options.joinToString(", ") { quote(it) }).append("]")
             }
-            append("}, \"required\": [")
-            append(spec.params.filter { it.required }.joinToString(", ") { quote(it.name) })
-            append("]}}")
-            append(if (i < specs.lastIndex) ",\n" else "\n")
+            append("}")
         }
-        append("]\n")
+        append("}, \"required\": [")
+        append(spec.params.filter { it.required }.joinToString(", ") { quote(it.name) })
+        append("]}}")
     }
 
     private fun quote(s: String): String = buildString {

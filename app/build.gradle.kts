@@ -15,6 +15,23 @@ android {
         // CI passes the run number / tag so every build installs over the previous one.
         versionCode = System.getenv("SHUTTLE_VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = System.getenv("SHUTTLE_VERSION_NAME") ?: "0.1.0"
+
+        // The on-device model (llama.cpp) is native code. Only 64-bit ARM is built: every phone
+        // GrapheneOS supports is arm64, and each extra ABI would add several MB.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_static")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     // Debug builds use a throwaway test key kept in the repo (app/debug.keystore, the standard

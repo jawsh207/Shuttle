@@ -65,8 +65,26 @@ flashlight is known once Android has reported it, which happens as the panel ope
 Calls and texts always show who and what first and wait for you to tap **Call** or **Send**,
 or to say yes or no.
 
-Chat and web search aren't in yet (see [Roadmap](#roadmap)). Anything Shuttle
-doesn't recognise gets a short "I can't do that yet".
+## The on-device model
+
+Anything the commands above don't cover (questions, conversation, unusual wordings) goes to
+**Granite 4.2 3B**, IBM's Apache 2.0 model, running entirely on the phone through
+[llama.cpp](https://github.com/ggml-org/llama.cpp). There's no account, no API key and no usage
+limit, and nothing you ask leaves the phone.
+
+- **Download once:** Settings › Model › Download (2.2 GB, Wi-Fi only by default). It continues
+  with Shuttle closed and shows progress in the notification shade. Until then, phone commands
+  work and other requests get a short note saying the model isn't downloaded yet.
+- **Checked before use:** the download's SHA-256 must match the one in
+  [models/manifest.json](models/manifest.json); anything else is deleted.
+- **Updates:** the project chooses the model in `models/manifest.json`. When it changes,
+  Settings offers the update. Users never pick or configure a model.
+- **Tools:** the model can use every phone command. Calls and texts it starts still stop at the
+  confirmation card, and it can't skip it.
+- **Memory:** about 3 GB while loaded. It loads on the first request that needs it and unloads
+  after five quiet minutes.
+- **No internet yet:** the model can't look things up, and it says so rather than guessing (see
+  [Roadmap](#roadmap)).
 
 ## Voice
 
@@ -105,6 +123,7 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
+| Internet (granted at install; GrapheneOS can turn it off) | Downloading the model once, and checking `models/manifest.json` for model updates. Requests never go online |
 | Wi-Fi and network state (granted at install) | Answering "is Wi-Fi on?" and "is mobile data on?" |
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
@@ -128,8 +147,12 @@ Until the release signing secrets are set (see [Signing](#signing)), each run in
 (`app/debug.keystore`). It installs next to release builds as *Shuttle Debug*, and each debug
 build updates the last one. It's for testing only: the key is public, and releases never use it.
 
+The repository includes llama.cpp as a git submodule, so clone with
+`git clone --recursive` (or run `git submodule update --init` after cloning).
+
 To build locally: `./gradlew assembleRelease` (or `assembleDebug`). Unit tests:
-`./gradlew testDebugUnitTest`. Requires JDK 17 and an Android SDK with compileSdk 37.
+`./gradlew testDebugUnitTest`. Requires JDK 17, an Android SDK with compileSdk 37, and the Android NDK and CMake (Android Studio
+installs both when asked).
 
 ### Releases
 
@@ -152,12 +175,9 @@ Without them CI still compiles and runs the tests, but publishes no APK.
 
 ## Roadmap
 
-1. **On-device model** for chat and for commands the rules don't cover. The model is chosen and
-   updated by the project, downloaded once on first run; no accounts or API keys. A tiny
-   tool-calling model bundled in the APK covers commands before the download finishes. The
-   tool list it calls is [docs/tools.json](docs/tools.json).
-2. **Live information:** web search and page reading, with sources.
-3. **More tools:** notification reading and replies, calendar, screen context.
+1. **Live information:** web search and page reading, with sources, so the model can answer
+   questions about current events.
+2. **More tools:** notification reading and replies, calendar, screen text.
 
 ## License
 

@@ -46,6 +46,11 @@ jobs:
         with:
           fetch-depth: 0 # full history + tags, for release notes
 
+      # llama.cpp (app/src/main/cpp/llama.cpp), pinned to a release. Only the pinned commit is
+      # fetched, not its history.
+      - name: Fetch llama.cpp
+        run: git submodule update --init --depth 1
+
       - name: Detect release
         shell: bash
         env:

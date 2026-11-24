@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import app.shuttle.assistant.chats.ChatPrefs
 import app.shuttle.assistant.chats.ChatStore
+import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.tools.DeviceTools
 import app.shuttle.assistant.ui.AssistantViewModel
 import app.shuttle.assistant.ui.ChatScreen
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DeviceTools.prepare(this)
+        ModelManager.start(this)
         val prefs = VoicePrefs(this)
         val chatPrefs = ChatPrefs(this)
         val store = ChatStore(File(filesDir, "chats"))

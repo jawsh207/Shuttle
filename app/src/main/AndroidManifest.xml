@@ -11,6 +11,10 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Needed to show the system "turn on Bluetooth?" prompt on Android 12+. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Downloading the on-device model (once, through Android's download manager) and
+         checking models/manifest.json on GitHub for model updates. Nothing else uses the
+         network: every request is handled on the phone. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Answering "is Wi-Fi on?" and "is mobile data on?". Granted at install. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

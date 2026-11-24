@@ -15,6 +15,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import app.shuttle.assistant.chats.ChatStore
+import app.shuttle.assistant.llm.ModelManager
+import androidx.compose.material3.Button
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -187,6 +190,31 @@ private fun Welcome(send: (String) -> Unit) {
         ) {
             listOf("Flashlight on", "Set a timer for 10 minutes", "What's on?", "What can you do?").forEach { text ->
                 SuggestionChip(onClick = { send(text) }, label = { Text(text) })
+            }
+        }
+        ModelNotice()
+    }
+}
+
+/** Until the model is on the phone: what it adds, and a way to get it. */
+@Composable
+private fun ModelNotice() {
+    val context = LocalContext.current
+    val state = ModelManager.state
+    val text = when (state) {
+        is ModelManager.State.Ready -> return
+        is ModelManager.State.Downloading -> "Downloading the model, ${state.percent}%. Phone commands work in the meantime."
+        ModelManager.State.WaitingForWifi -> "The model download is waiting for Wi-Fi."
+        ModelManager.State.Checking -> "Checking the model download…"
+        is ModelManager.State.Failed, ModelManager.State.Missing ->
+            "Phone commands work now. For chat and questions, download the model (${ModelManager.current.sizeLabel}, once)."
+    }
+    Spacer(Modifier.height(24.dp))
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceBright) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+            if (state is ModelManager.State.Missing || state is ModelManager.State.Failed) {
+                Button(onClick = { ModelManager.download(context) }) { Text("Download") }
             }
         }
     }
