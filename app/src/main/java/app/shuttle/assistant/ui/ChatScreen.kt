@@ -1,5 +1,21 @@
 package app.shuttle.assistant.ui
 
+import android.text.format.DateUtils
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import app.shuttle.assistant.chats.ChatStore
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,19 +74,47 @@ import app.shuttle.assistant.voice.VoiceSession
  * only the frame differs. The assist gesture always opens the small bottom panel instead
  * ([app.shuttle.assistant.assist.AssistActivity]).
  *
- * The search bar searches this conversation (what was asked and what came back). Until the
- * first request, the page shows a greeting and a few suggestions to tap. Unlike the assist
- * panel, it neither listens nor opens the keyboard on its own, and it stays open when a
- * command opens another app, so the chat is there when you come back.
+ * Chats are saved as you go ([ChatStore]). Tapping the search bar turns the page into the
+ * list of saved chats, newest first, with "New chat" at the top; typing searches every chat,
+ * and touching and holding one offers Delete (with Undo). The + beside the gear starts a new
+ * chat straight away. Until the first request, a chat shows a greeting and a few suggestions
+ * to tap. Unlike the assist panel, it neither listens nor opens the keyboard on its own, and
+ * it stays open when a command opens another app, so the chat is there when you come back.
  */
 @Composable
 fun ChatScreen(
     vm: AssistantViewModel,
     voice: VoiceSession?,
     speakReplies: () -> Boolean,
+    store: ChatStore,
+    saving: () -> Boolean,
     onOpenSettings: () -> Unit,
 ) {
-    var query by rememberSaveable { mutableStateOf<String?>(null) } // null = not searching
+    var query by rememberSaveable { mutableStateOf<String?>(null) } // null = in a chat, not browsing
+    var chats by remember { mutableStateOf(emptyList<ChatStore.Chat>()) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // Re-read the saved chats each time the list opens.
+    LaunchedEffect(query == null) { if (query != null) chats = store.list() }
+
+    fun newChat() {
+        vm.newChat()
+        query = null
+    }
+
+    fun delete(chat: ChatStore.Chat) {
+        store.delete(chat.id)
+        vm.forget(chat.id)
+        chats = store.list()
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            if (snackbar.showSnackbar("Chat deleted", actionLabel = "Undo", duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed) {
+                store.save(chat)
+                chats = store.list()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             SearchBarPill(
@@ -78,14 +122,27 @@ fun ChatScreen(
                 onQueryChange = { query = it },
                 onActiveChange = { active -> query = if (active) "" else null },
                 trailing = {
+                    IconButton(onClick = { newChat() }, enabled = vm.exchanges.isNotEmpty()) {
+                        Icon(Icons.Rounded.Add, "New chat")
+                    }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Rounded.Settings, "Settings") }
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val q = query
-        if (q != null && q.isNotBlank()) {
-            SearchResults(vm, q, padding)
+        if (q != null) {
+            ChatList(
+                results = ChatStore.search(chats, q),
+                searching = q.isNotBlank(),
+                openId = vm.chatId,
+                saving = saving(),
+                padding = padding,
+                onNewChat = { newChat() },
+                onOpen = { chat -> vm.open(chat); query = null },
+                onDelete = { delete(it) },
+            )
         } else {
             AssistantPanel(
                 vm = vm,
@@ -135,40 +192,111 @@ private fun Welcome(send: (String) -> Unit) {
     }
 }
 
-/** What was asked or answered in this conversation that contains [query]. */
+/**
+ * Saved chats, newest first, with "New chat" at the top. While searching, each row's second
+ * line is where the words were found. Touch and hold a chat for Delete.
+ */
 @Composable
-private fun SearchResults(vm: AssistantViewModel, query: String, padding: PaddingValues) {
-    val matches = vm.exchanges.filter {
-        it.asked.contains(query, ignoreCase = true) || it.result.text.contains(query, ignoreCase = true)
-    }
-    if (matches.isEmpty()) {
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-            Text(
-                "Nothing in this conversation matches \"$query\".",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(32.dp),
-            )
-        }
-        return
-    }
+private fun ChatList(
+    results: List<Pair<ChatStore.Chat, String>>,
+    searching: Boolean,
+    openId: String?,
+    saving: Boolean,
+    padding: PaddingValues,
+    onNewChat: () -> Unit,
+    onOpen: (ChatStore.Chat) -> Unit,
+    onDelete: (ChatStore.Chat) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().consumeWindowInsets(padding),
         contentPadding = PaddingValues(
             start = 16.dp, end = 16.dp,
             top = padding.calculateTopPadding() + 8.dp,
-            bottom = padding.calculateBottomPadding() + 8.dp,
+            bottom = padding.calculateBottomPadding() + 16.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Shown settled: confirming or granting happens in the conversation, not in results.
-        items(matches, key = { it.id }) { ExchangeView(it.copy(settled = true)) }
+        if (!searching) {
+            item(key = "new") {
+                Surface(onClick = onNewChat, shape = RoundedCornerShape(20.dp), color = scheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Add, null)
+                        Spacer(Modifier.width(12.dp))
+                        Text("New chat", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        if (results.isEmpty()) {
+            item(key = "empty") {
+                Text(
+                    when {
+                        searching -> "No chats match."
+                        saving -> "No saved chats yet. Chats are saved as you go."
+                        else -> "Saving chats is off in Settings."
+                    },
+                    color = scheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                )
+            }
+        } else {
+            item(key = "header") {
+                Text(
+                    if (searching) "Matching chats" else "Recent chats · touch and hold to delete",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = scheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                )
+            }
+            items(results, key = { it.first.id }) { (chat, snippet) ->
+                ChatRow(chat, snippet, isOpen = chat.id == openId, onOpen = { onOpen(chat) }, onDelete = { onDelete(chat) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatRow(chat: ChatStore.Chat, snippet: String, isOpen: Boolean, onOpen: () -> Unit, onDelete: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
+    val now = System.currentTimeMillis()
+    val whenText = DateUtils.getRelativeTimeSpanString(chat.updated, now, DateUtils.MINUTE_IN_MILLIS).toString()
+    Box {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = scheme.surfaceBright,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Delete options"),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(chat.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (snippet.isNotBlank()) {
+                    Text(snippet, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Text(
+                    if (isOpen) "$whenText · open now" else whenText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                onClick = { menu = false; onDelete() },
+            )
+        }
     }
 }
 
 /**
- * The search pill, as in Dialtone: tap to search, back arrow to stop, and a [trailing] slot
- * for the settings gear while not searching.
+ * The search pill, as in Dialtone: tap to browse and search chats, back arrow to return to the
+ * chat, and a [trailing] slot for the new-chat and settings buttons while not searching.
  */
 @Composable
 private fun SearchBarPill(
@@ -197,7 +325,7 @@ private fun SearchBarPill(
                     Icon(Icons.Rounded.Search, null, tint = scheme.onSurfaceVariant)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Search conversation",
+                        "Search chats",
                         style = MaterialTheme.typography.bodyLarge,
                         color = scheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -217,7 +345,7 @@ private fun SearchBarPill(
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
                                 if (query.isEmpty()) {
-                                    Text("Search what you asked and what came back", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+                                    Text("Search your chats", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                                 }
                                 inner()
                             }

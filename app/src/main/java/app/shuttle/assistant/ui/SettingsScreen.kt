@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.shuttle.assistant.assist.AssistActivity
+import app.shuttle.assistant.chats.ChatPrefs
 import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.tools.accessSettingsIntent
 import app.shuttle.assistant.tools.hasAccess
@@ -64,10 +67,11 @@ import app.shuttle.assistant.voice.VoicePrefs
  * Nothing here is required up front. Each tool also asks for its own access the first time
  * it's used; this screen is for granting things ahead of time and checking what's on. Every
  * status is re-read when the user comes back from a system Settings page. Each section
- * collapses from its heading and shows a one-line summary while closed.
+ * collapses from its heading and shows a one-line summary while closed. The Chats section
+ * turns saving off and deletes every saved chat.
  */
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     // Bumped on every resume so statuses re-read after the user comes back from Settings.
     var refresh by remember { mutableIntStateOf(0) }
@@ -85,6 +89,19 @@ fun SettingsScreen(onBack: () -> Unit) {
     var permissionsOpen by rememberSaveable { mutableStateOf(true) }
     var voiceOpen by rememberSaveable { mutableStateOf(true) }
     var specialOpen by rememberSaveable { mutableStateOf(true) }
+    var chatsOpen by rememberSaveable { mutableStateOf(true) }
+    var confirmDeleteAll by rememberSaveable { mutableStateOf(false) }
+    if (confirmDeleteAll) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteAll = false },
+            title = { Text("Delete all chats?") },
+            text = { Text("Every saved chat is removed from this phone. This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDeleteAll = false; onDeleteAllChats(); refresh++ }) { Text("Delete all") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteAll = false }) { Text("Cancel") } },
+        )
+    }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -199,6 +216,25 @@ fun SettingsScreen(onBack: () -> Unit) {
                     ToggleRow("Speak replies", "Read answers aloud when you asked by voice.", voicePrefs.speakReplies) {
                         voicePrefs.speakReplies = it
                         refresh++
+                    }
+                }
+
+                Section(
+                    "Chats",
+                    summary = if (chatPrefs.saveChats) "Chats are saved on this phone" else "Chats aren't saved",
+                    expanded = chatsOpen,
+                    onToggle = { chatsOpen = !chatsOpen },
+                ) {
+                    ToggleRow(
+                        "Save chats",
+                        "Keep chats from the full-screen chat so you can search and reopen them. They stay on this phone. Quick commands from the assist panel aren't saved.",
+                        chatPrefs.saveChats,
+                    ) {
+                        chatPrefs.saveChats = it
+                        refresh++
+                    }
+                    SetupRow("Delete all chats", "Remove every saved chat from this phone.", done = false, action = "Delete") {
+                        confirmDeleteAll = true
                     }
                 }
 

@@ -23,10 +23,19 @@ first request it shows a greeting and a few suggestions to tap. It doesn't liste
 keyboard by itself, and it stays put when a command opens another app. The assist gesture
 always opens the small panel, never this chat.
 
+Chats in this view are **saved as you go** (`chats/ChatStore.kt`): one small text file per chat
+in the app's private folder, which only Shuttle can read. Android backup is off for the app,
+so nothing leaves the phone. Tapping the search bar turns the page into the list of saved chats,
+newest first, with New chat at the top; typing searches every chat; tapping one reopens it;
+touching and holding one offers Delete, with Undo. The + beside the gear starts a new chat. A
+saved chat keeps only text, so a card that was waiting for Send or Allow comes back as plain
+text and can never be acted on later. The assist panel's quick commands aren't saved.
+
 The gear opens **Settings** (`ui/SettingsScreen.kt`), sliding in over the chat: a checklist for
 choosing Shuttle as assistant, granting permissions and special accesses, checking the voice
-services and their settings, and a button to try the assistant panel. Each section (Assistant,
-Permissions, Voice, Special access) folds away from its heading, and while folded it shows a
+services and their settings, a Chats section for turning saving off or deleting every chat,
+and a button to try the assistant panel. Each section (Assistant, Permissions, Voice, Chats,
+Special access) folds away from its heading, and while folded it shows a
 one-line summary such as "3 of 4 allowed".
 
 ## Voice
@@ -110,7 +119,9 @@ timers are created in your own clock app, which rings them.
 | File | What it is |
 | --- | --- |
 | `MainActivity.kt` | Launcher entry: the full-screen chat, with Settings over it |
-| `ui/ChatScreen.kt` | Full-screen chat: search bar, settings gear, greeting and suggestions |
+| `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
+| `chats/ChatStore.kt` | Saved chats: one private text file each; listing, search, delete |
+| `chats/ChatPrefs.kt` | Whether chats are saved |
 | `ui/SettingsScreen.kt` | Assistant role, permissions, special access and voice settings |
 | `assist/AssistActivity.kt` | The assistant panel over other apps |
 | `ui/AssistantPanel.kt` | Conversation, input box and result cards |

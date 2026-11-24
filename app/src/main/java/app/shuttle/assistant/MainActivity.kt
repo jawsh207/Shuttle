@@ -20,6 +20,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
+import app.shuttle.assistant.chats.ChatPrefs
+import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.tools.DeviceTools
 import app.shuttle.assistant.ui.AssistantViewModel
 import app.shuttle.assistant.ui.ChatScreen
@@ -27,6 +29,7 @@ import app.shuttle.assistant.ui.SettingsScreen
 import app.shuttle.assistant.ui.theme.ShuttleTheme
 import app.shuttle.assistant.voice.VoicePrefs
 import app.shuttle.assistant.voice.VoiceSession
+import java.io.File
 
 /**
  * The launcher entry: Shuttle's full-screen chat, with Settings sliding in over it from the
@@ -34,8 +37,9 @@ import app.shuttle.assistant.voice.VoiceSession
  *
  * The assist gesture never comes here; it opens the small bottom panel
  * ([app.shuttle.assistant.assist.AssistActivity]). Both run the same conversation code. This
- * chat keeps its conversation while the app is open, including across rotation and trips to
- * other apps that a command opened.
+ * chat is saved as it goes to the app's private storage ([ChatStore]), and keeps its
+ * conversation across rotation and trips to other apps that a command opened. Each fresh
+ * launch starts a new chat; earlier ones are behind the search bar.
  */
 class MainActivity : ComponentActivity() {
 
@@ -47,6 +51,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         DeviceTools.prepare(this)
         val prefs = VoicePrefs(this)
+        val chatPrefs = ChatPrefs(this)
+        val store = ChatStore(File(filesDir, "chats"))
+        vm.attach(store) { chatPrefs.saveChats }
         val session = VoiceSession(this).also { voice = it }
         setContent {
             ShuttleTheme {
@@ -59,6 +66,8 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         voice = session,
                         speakReplies = { prefs.speakReplies },
+                        store = store,
+                        saving = { chatPrefs.saveChats },
                         onOpenSettings = { settingsOpen = true },
                     )
                     AnimatedVisibility(
@@ -66,7 +75,14 @@ class MainActivity : ComponentActivity() {
                         enter = slideInHorizontally(spatial) { it / 4 } + fadeIn(effects),
                         exit = slideOutHorizontally(spatial) { it / 4 } + fadeOut(effects),
                     ) {
-                        SettingsScreen(onBack = { settingsOpen = false })
+                        SettingsScreen(
+                            chatPrefs = chatPrefs,
+                            onDeleteAllChats = {
+                                store.deleteAll()
+                                vm.newChat()
+                            },
+                            onBack = { settingsOpen = false },
+                        )
                     }
                 }
             }
