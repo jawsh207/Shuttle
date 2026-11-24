@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -46,10 +47,13 @@ import app.shuttle.assistant.assist.AssistActivity
 import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.tools.accessSettingsIntent
 import app.shuttle.assistant.tools.hasAccess
+import app.shuttle.assistant.tools.launch
+import app.shuttle.assistant.voice.VoicePrefs
 import app.shuttle.assistant.ui.theme.ShuttleTheme
 
 /**
- * Setup: make Shuttle the default assistant, grant what its tools need, and try a command.
+ * Setup: make Shuttle the default assistant, grant what its tools need, check the voice
+ * services, and try a command.
  *
  * Nothing here is required up front. Each tool also asks for its own access the first time
  * it's used; this screen is for granting things ahead of time and checking what's on.
@@ -75,6 +79,7 @@ private fun SetupScreen() {
 
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val scrollState = rememberScrollState()
+    val voicePrefs = remember { VoicePrefs(context) }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = { LargeTopAppBar(title = { Text("Shuttle") }, scrollBehavior = scroll) },
@@ -122,6 +127,38 @@ private fun SetupScreen() {
                     SetupRow(access.label, why, granted, "Allow") { permissions.launch(access.permissions.toTypedArray()) }
                 }
 
+                Section("Voice")
+                val recognizers = VoicePrefs.recognizers(context)
+                val engines = VoicePrefs.ttsEngines(context)
+                SetupRow(
+                    Access.MICROPHONE.label,
+                    "Lets your speech recogniser hear you. Shuttle never records on its own.",
+                    context.hasAccess(Access.MICROPHONE),
+                    "Allow",
+                ) { permissions.launch(Access.MICROPHONE.permissions.toTypedArray()) }
+                SetupRow(
+                    "Speech recogniser",
+                    if (recognizers.isEmpty()) "None installed. Install one, such as Distillery, for voice input."
+                    else "Uses your default voice input. Installed: ${recognizers.joinToString()}.",
+                    done = false,
+                    action = "Settings",
+                ) { context.launch(VoicePrefs.recognizerSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
+                SetupRow(
+                    "Text-to-speech",
+                    if (engines.isEmpty()) "No engine installed, so replies are shown but not spoken."
+                    else "Speaks with your default engine. Installed: ${engines.joinToString()}.",
+                    done = false,
+                    action = "Settings",
+                ) { context.launch(VoicePrefs.ttsSettings()) || context.launch(Intent(Settings.ACTION_SETTINGS)) }
+                ToggleRow("Listen when Shuttle opens", "Start listening right away instead of showing the keyboard.", voicePrefs.listenOnOpen) {
+                    voicePrefs.listenOnOpen = it
+                    refresh++
+                }
+                ToggleRow("Speak replies", "Read answers aloud when you asked by voice.", voicePrefs.speakReplies) {
+                    voicePrefs.speakReplies = it
+                    refresh++
+                }
+
                 Section("Special access")
                 val special = listOf(
                     Access.DO_NOT_DISTURB to "Turn Do Not Disturb and silent mode on and off.",
@@ -152,6 +189,23 @@ private fun Section(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 4.dp, top = 12.dp),
     )
+}
+
+@Composable
+private fun ToggleRow(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.padding(start = 12.dp))
+        }
+    }
 }
 
 @Composable

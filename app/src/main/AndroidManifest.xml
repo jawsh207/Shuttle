@@ -11,6 +11,9 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Needed to show the system "turn on Bluetooth?" prompt on Android 12+. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Voice input. The user's speech recogniser does the recording, but recognisers only
+         accept callers that hold this permission. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Do Not Disturb and silent mode; the user grants it in Settings. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Brightness and auto-rotate; the user grants "Modify system settings" in Settings. -->
@@ -27,6 +30,13 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
+        </intent>
+        <!-- The user's speech recogniser and text-to-speech engine (Distillery or any other). -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 

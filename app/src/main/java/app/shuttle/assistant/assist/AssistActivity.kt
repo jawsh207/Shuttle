@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import app.shuttle.assistant.ui.AssistantPanel
 import app.shuttle.assistant.ui.AssistantViewModel
 import app.shuttle.assistant.ui.theme.ShuttleTheme
+import app.shuttle.assistant.voice.VoicePrefs
+import app.shuttle.assistant.voice.VoiceSession
 
 /**
  * The assistant panel that opens over whatever app is on screen.
@@ -38,16 +40,24 @@ import app.shuttle.assistant.ui.theme.ShuttleTheme
  * system's default, replacing the user's own speech-to-text app. Screen context ("what's on
  * my screen") needs the voice-interaction route and is a later step.
  *
+ * Voice goes through the phone's own speech recogniser and text-to-speech engine
+ * ([VoiceSession]); with the default settings the panel starts listening as it opens.
+ *
  * Tapping the dimmed area or pressing back closes it. The conversation survives rotation but
  * starts fresh each time the panel is opened.
  */
 class AssistActivity : ComponentActivity() {
 
     private val vm: AssistantViewModel by viewModels()
+    private var voice: VoiceSession? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val prefs = VoicePrefs(this)
+        val session = VoiceSession(this).also { voice = it }
+        // Listen on open only for a fresh panel, not when it's recreated after rotation.
+        val listenOnOpen = prefs.listenOnOpen && savedInstanceState == null
         setContent {
             ShuttleTheme {
                 Box(
@@ -78,12 +88,24 @@ class AssistActivity : ComponentActivity() {
                                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
                                 )
                             }
-                            AssistantPanel(vm, onClose = ::finish)
+                            AssistantPanel(
+                                vm,
+                                onClose = ::finish,
+                                voice = session,
+                                listenOnOpen = listenOnOpen,
+                                speakReplies = prefs.speakReplies,
+                            )
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        voice?.close()
+        voice = null
+        super.onDestroy()
     }
 
     /**

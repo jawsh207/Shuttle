@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,11 +19,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -45,41 +49,67 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.engine.ToolResult
 import app.shuttle.assistant.tools.accessSettingsIntent
+import app.shuttle.assistant.tools.hasAccess
 import app.shuttle.assistant.tools.launch
+import app.shuttle.assistant.voice.VoiceSession
 
 /**
  * The assistant's conversation and input box: what you asked, what Shuttle did, and cards for
  * anything that needs you (confirming a call or text, granting an access).
  *
- * [onClose] runs when a result opened another app or screen, so the panel gets out of the way.
+ * With a [voice] session, the mic button listens through the phone's speech recogniser and
+ * spoken requests get spoken answers (see [VoiceConversation]). [listenOnOpen] starts
+ * listening straight away instead of opening the keyboard. [onClose] runs when a result
+ * opened another app or screen, so the panel gets out of the way.
  */
 @Composable
-fun AssistantPanel(vm: AssistantViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun AssistantPanel(
+    vm: AssistantViewModel,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    voice: VoiceSession? = null,
+    listenOnOpen: Boolean = false,
+    speakReplies: Boolean = true,
+) {
     val context = LocalContext.current
     var input by rememberSaveable { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     val list = rememberLazyListState()
+    val talk = remember(vm, voice) { VoiceConversation(context, vm, voice, speakReplies, onClose) }
 
     // Which exchange asked for a runtime permission, so its call can run once it's granted.
     var waitingId by rememberSaveable { mutableStateOf(-1) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         val exchange = vm.exchanges.firstOrNull { it.id == waitingId }
         waitingId = -1
-        if (exchange != null && granted.values.all { it } && vm.retry(context, exchange)) onClose()
+        if (exchange != null && granted.values.all { it }) talk.retry(exchange)
     }
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) talk.startListening() else talk.hint = "Voice needs the microphone permission."
+    }
+    talk.requestMic = { mic.launch(Access.MICROPHONE.permissions.first()) }
 
     fun send() {
         val text = input
         input = ""
-        if (vm.submit(context, text)) onClose()
+        if (text.isNotBlank()) talk.submit(text, spoken = false)
     }
 
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(Unit) {
+        if (listenOnOpen && talk.canListen && context.hasAccess(Access.MICROPHONE)) {
+            talk.startListening()
+        } else {
+            focus.requestFocus()
+        }
+    }
     LaunchedEffect(vm.exchanges.size) {
         if (vm.exchanges.isNotEmpty()) list.animateScrollToItem(vm.exchanges.lastIndex)
     }
+
+    val state = voice?.state ?: VoiceSession.State.Idle
 
     Column(modifier) {
         if (vm.exchanges.isNotEmpty()) {
@@ -91,8 +121,8 @@ fun AssistantPanel(vm: AssistantViewModel, onClose: () -> Unit, modifier: Modifi
                 items(vm.exchanges, key = { it.id }) { exchange ->
                     ExchangeView(
                         exchange = exchange,
-                        onConfirm = { if (vm.confirm(context, exchange)) onClose() },
-                        onCancel = { vm.cancel(exchange) },
+                        onConfirm = { voice?.cancelListening(); talk.confirm(exchange) },
+                        onCancel = { voice?.cancelListening(); vm.cancel(exchange) },
                         onGrant = { result ->
                             if (result.access.isRuntimePermission) {
                                 waitingId = exchange.id
@@ -102,7 +132,7 @@ fun AssistantPanel(vm: AssistantViewModel, onClose: () -> Unit, modifier: Modifi
                                 context.accessSettingsIntent(result.access)?.let { context.launch(it) }
                             }
                         },
-                        onRetry = { if (vm.retry(context, exchange)) onClose() },
+                        onRetry = { talk.retry(exchange) },
                     )
                 }
             }
@@ -112,10 +142,25 @@ fun AssistantPanel(vm: AssistantViewModel, onClose: () -> Unit, modifier: Modifi
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val listening = state as? VoiceSession.State.Listening
             TextField(
                 value = input,
-                onValueChange = { input = it },
-                placeholder = { Text("Ask Shuttle") },
+                onValueChange = {
+                    // Typing takes over from the mic.
+                    voice?.cancelListening()
+                    voice?.stopSpeaking()
+                    input = it
+                },
+                placeholder = {
+                    Text(
+                        when {
+                            listening != null && listening.heard.isNotEmpty() -> listening.heard
+                            listening != null -> "Listening…"
+                            else -> talk.hint ?: "Ask Shuttle"
+                        },
+                        maxLines = 2,
+                    )
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 colors = TextFieldDefaults.colors(
@@ -126,8 +171,23 @@ fun AssistantPanel(vm: AssistantViewModel, onClose: () -> Unit, modifier: Modifi
                 keyboardActions = KeyboardActions(onSend = { send() }),
                 modifier = Modifier.weight(1f).focusRequester(focus),
             )
-            FilledIconButton(onClick = { send() }, enabled = input.isNotBlank()) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+            when {
+                input.isNotBlank() -> FilledIconButton(onClick = { send() }) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                }
+                // Tap while listening to stop and use what was heard so far.
+                listening != null -> FilledIconButton(onClick = { voice?.finishListening() }, modifier = Modifier.size(48.dp)) {
+                    LoadingIndicator(Modifier.size(32.dp), color = MaterialTheme.colorScheme.onPrimary)
+                }
+                state == VoiceSession.State.Speaking -> FilledIconButton(onClick = { voice?.stopSpeaking() }) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Stop speaking")
+                }
+                voice != null -> FilledIconButton(onClick = { talk.startListening() }) {
+                    Icon(Icons.Filled.Mic, contentDescription = "Speak")
+                }
+                else -> FilledIconButton(onClick = { send() }, enabled = false) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                }
             }
         }
     }

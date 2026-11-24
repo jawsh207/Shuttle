@@ -41,6 +41,7 @@ enum class Access(val label: String, val permissions: List<String>) {
     PHONE("Phone calls", listOf("android.permission.CALL_PHONE")),
     SMS("Send text messages", listOf("android.permission.SEND_SMS")),
     NEARBY_DEVICES("Nearby devices (Bluetooth)", listOf("android.permission.BLUETOOTH_CONNECT")),
+    MICROPHONE("Microphone", listOf("android.permission.RECORD_AUDIO")),
     DO_NOT_DISTURB("Do Not Disturb access", emptyList()),
     SYSTEM_SETTINGS("Modify system settings", emptyList());
 

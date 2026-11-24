@@ -7,7 +7,8 @@ each part. Paths are under `app/src/main/java/app/shuttle/assistant/`.
 
 When Shuttle is your default digital assistant, the assist gesture or a long-press of the power
 button opens **the assistant panel** (`assist/AssistActivity.kt`): a sheet at the bottom of the
-screen over whatever you were doing. Tap the dimmed area or press back to close it. Each time
+screen over whatever you were doing. It starts listening straight away (see Voice below). Tap
+the dimmed area or press back to close it. Each time
 it opens it starts a fresh conversation.
 
 Shuttle becomes eligible for the assistant role by handling Android's "assist" request with an
@@ -16,11 +17,29 @@ would then also make Shuttle your system speech recogniser, replacing whichever 
 app you use.
 
 The app's own icon opens **setup** (`MainActivity.kt`): a checklist for choosing Shuttle as
-assistant, granting permissions and special accesses, and a button to try a command.
+assistant, granting permissions and special accesses, checking the voice services and their
+settings, and a button to try a command.
+
+## Voice
+
+Shuttle borrows the phone's own speech services (`voice/VoiceSession.kt`): Android's
+speech recogniser API binds whichever recogniser is the system default, and the text-to-speech
+API uses the default engine. So with Distillery chosen in Settings, Distillery listens and
+speaks; with another engine, that one does. Shuttle needs the microphone permission only
+because recognisers refuse callers without it; the recogniser does the recording.
+
+`ui/VoiceConversation.kt` runs the back-and-forth: listen, run what was heard, say the
+answer, and for a call or text ask "Send it?" and listen once more. `engine/Replies.kt` decides
+whether that answer is a yes or a no. It only accepts clear answers; anything else is treated
+as a new request and the card stays on screen, so nothing is sent on a guess. Typed requests
+go the same way but are never answered aloud.
+
+The two voice settings (listen when the panel opens, speak replies) live in
+`voice/VoicePrefs.kt`, which also lists the installed recognisers and engines for setup.
 
 ## From words to action
 
-1. **You type a command** in the panel (`ui/AssistantPanel.kt`).
+1. **You say or type a command** in the panel (`ui/AssistantPanel.kt`).
 2. **The fast path reads it** (`engine/CommandParser.kt`). It tidies the text ("Hey Shuttle,
    can you…please" becomes the command itself), then checks it against a list of phrasings
    such as "turn on X", "call X", "timer for X". Numbers said as words, clock times and
@@ -71,6 +90,10 @@ timers are created in your own clock app, which rings them.
 | `assist/AssistActivity.kt` | The assistant panel over other apps |
 | `ui/AssistantPanel.kt` | Conversation, input box and result cards |
 | `ui/AssistantViewModel.kt` | Holds the conversation; runs commands, confirmations and retries |
+| `ui/VoiceConversation.kt` | Listen, run, speak the answer, ask yes/no for calls and texts |
+| `voice/VoiceSession.kt` | The phone's speech recogniser and text-to-speech engine |
+| `voice/VoicePrefs.kt` | Voice settings; installed recognisers and engines |
+| `engine/Replies.kt` | Reads a spoken yes or no |
 | `ui/theme/Theme.kt` | Material 3 Expressive theme with wallpaper colours |
 | `engine/Tools.kt` | Shared types: tool calls, tool descriptions, results, accesses |
 | `engine/ToolSchemas.kt` | Every tool and its arguments; JSON export |

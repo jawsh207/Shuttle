@@ -11,8 +11,8 @@ does and where each part lives in the code. Working on the code? See
 
 ## What it does today
 
-Shuttle understands typed commands for the phone itself. Everything runs on the device; nothing
-is sent anywhere.
+Shuttle understands spoken or typed commands for the phone itself. Everything runs on the
+device; nothing is sent anywhere.
 
 | Area | Examples |
 | --- | --- |
@@ -27,10 +27,25 @@ is sent anywhere.
 | Apps and places | "open camera", "navigate to the library" |
 | Status | "battery", "what time is it", "what's the date" |
 
-Calls and texts always show who and what first and wait for you to tap **Call** or **Send**.
+Calls and texts always show who and what first and wait for you to tap **Call** or **Send**,
+or to say yes or no.
 
-Chat, web search and voice input aren't in yet (see [Roadmap](#roadmap)). Anything Shuttle
+Chat and web search aren't in yet (see [Roadmap](#roadmap)). Anything Shuttle
 doesn't recognise gets a short "I can't do that yet".
+
+## Voice
+
+Shuttle has no speech engine of its own: it listens through your phone's default speech
+recogniser and speaks through your default text-to-speech engine, so whichever on-device engine
+you've chosen (Distillery, or any other) is the one used. Change them in Settings and Shuttle
+follows.
+
+- The panel starts listening as soon as it opens; tap the mic to speak again, or start typing to
+  use the keyboard instead. Tap the moving indicator to stop listening early.
+- Answers to spoken requests are spoken back; typed requests get text only.
+- For a call or text, Shuttle reads out who and what and asks "Send it?". Only a clear yes or no
+  counts; anything else is taken as a new request and the card stays on screen to tap.
+- Both behaviours can be turned off in setup (*Listen when Shuttle opens*, *Speak replies*).
 
 ## What Android allows (no root, no Shizuku)
 
@@ -54,6 +69,7 @@ setup screen lets you grant things ahead of time.
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
+| Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
 | Modify system settings (special) | Brightness and auto-rotate |
 | Set alarms | Creating alarms and timers in your clock app |
@@ -99,8 +115,7 @@ Without them CI still compiles and runs the tests, but publishes no APK.
    tool-calling model bundled in the APK covers commands before the download finishes. The
    tool list it calls is [docs/tools.json](docs/tools.json).
 2. **Live information:** web search and page reading, with sources.
-3. **Voice:** speech input and spoken replies.
-4. **More tools:** notification reading and replies, calendar, screen context.
+3. **More tools:** notification reading and replies, calendar, screen context.
 
 ## License
 
