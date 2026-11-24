@@ -95,7 +95,7 @@ class AssistActivity : ComponentActivity() {
                                 onClose = ::finish,
                                 voice = session,
                                 listenOnOpen = listenOnOpen,
-                                speakReplies = prefs.speakReplies,
+                                speakReplies = { prefs.speakReplies },
                             )
                         }
                     }

@@ -9,6 +9,15 @@ New here? [How Shuttle works](docs/HOW-IT-WORKS.md) is a plain-language tour of 
 does and where each part lives in the code. Working on the code? See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Two ways in
+
+- **The assist gesture** (or a long-press of the power button) opens a small panel at the bottom
+  of the screen, over whatever you're doing. It starts listening straight away.
+- **The launcher icon** opens a full-screen chat, laid out like the other apps in the family: a
+  search bar at the top for searching the conversation, and the settings gear on its right.
+
+Both run the same commands the same way.
+
 ## What it does today
 
 Shuttle understands spoken or typed commands for the phone itself. Everything runs on the
@@ -60,7 +69,8 @@ follows.
 - Answers to spoken requests are spoken back; typed requests get text only.
 - For a call or text, Shuttle reads out who and what and asks "Send it?". Only a clear yes or no
   counts; anything else is taken as a new request and the card stays on screen to tap.
-- Both behaviours can be turned off in setup (*Listen when Shuttle opens*, *Speak replies*).
+- The chat from the launcher icon doesn't start listening on its own; tap the mic.
+- Both behaviours can be turned off in Settings (*Listen when the panel opens*, *Speak replies*).
 
 ## What Android allows (no root, no Shizuku)
 
@@ -75,8 +85,8 @@ Shuttle uses only what a normal app may do, so some switches need one tap from y
 
 ## Permissions
 
-Nothing is asked for up front. Each command asks for what it needs the first time, and the
-setup screen lets you grant things ahead of time.
+Nothing is asked for up front. Each command asks for what it needs the first time, and
+Settings (the gear in the chat's search bar) lets you grant things ahead of time.
 
 | Permission | Used for |
 | --- | --- |
@@ -92,7 +102,7 @@ setup screen lets you grant things ahead of time.
 
 ## Set as your assistant
 
-Open Shuttle and tap **Choose** next to *Default assistant*, then pick Shuttle under
+Open Shuttle, tap the gear in the search bar, and tap **Choose** next to *Default assistant*, then pick Shuttle under
 **Digital assistant app**. On GrapheneOS that's *Settings › Apps › Default apps › Digital
 assistant app*. Then turn on the gesture or power-button long-press there if it's off.
 

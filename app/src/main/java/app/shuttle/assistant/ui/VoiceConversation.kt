@@ -23,7 +23,7 @@ class VoiceConversation(
     private val context: Context,
     private val vm: AssistantViewModel,
     private val voice: VoiceSession?,
-    private val speakReplies: Boolean,
+    private val speakReplies: () -> Boolean,
     private val onClose: () -> Unit,
 ) {
     /** Asks for the microphone permission; set by the panel, which owns the launcher. */
@@ -38,7 +38,7 @@ class VoiceConversation(
     fun startListening() {
         hint = null
         if (voice == null || !voice.canListen) {
-            hint = "No speech recogniser is set up. Choose one in Shuttle's setup."
+            hint = "No speech recogniser is set up. Choose one in Shuttle's settings."
             return
         }
         if (!context.hasAccess(Access.MICROPHONE)) {
@@ -80,7 +80,7 @@ class VoiceConversation(
         val last = added.lastOrNull() ?: return
         val waitForAnswer = last.result is ToolResult.Confirm && !last.settled
         val next: () -> Unit = { if (waitForAnswer) listenForAnswer(last.id) }
-        if (speakReplies) voice.speak(added.joinToString(" ") { speechFor(it.result) }, next) else next()
+        if (speakReplies()) voice.speak(added.joinToString(" ") { speechFor(it.result) }, next) else next()
     }
 
     private fun listenForAnswer(id: Int) {

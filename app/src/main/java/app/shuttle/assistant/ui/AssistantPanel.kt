@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -64,6 +65,11 @@ import app.shuttle.assistant.voice.VoiceSession
  * spoken requests get spoken answers (see [VoiceConversation]). [listenOnOpen] starts
  * listening straight away instead of opening the keyboard. [onClose] runs when a result
  * opened another app or screen, so the panel gets out of the way.
+ *
+ * The same panel fills the launcher's full-screen chat: with [fullScreen] the conversation
+ * takes all the height above the input box, and [empty] is shown until the first request
+ * (it gets a function to send a suggestion). [focusOnOpen] controls whether the keyboard
+ * opens straight away.
  */
 @Composable
 fun AssistantPanel(
@@ -72,7 +78,10 @@ fun AssistantPanel(
     modifier: Modifier = Modifier,
     voice: VoiceSession? = null,
     listenOnOpen: Boolean = false,
-    speakReplies: Boolean = true,
+    speakReplies: () -> Boolean = { true },
+    fullScreen: Boolean = false,
+    focusOnOpen: Boolean = true,
+    empty: (@Composable (send: (String) -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var input by rememberSaveable { mutableStateOf("") }
@@ -101,7 +110,7 @@ fun AssistantPanel(
     LaunchedEffect(Unit) {
         if (listenOnOpen && talk.canListen && context.hasAccess(Access.MICROPHONE)) {
             talk.startListening()
-        } else {
+        } else if (focusOnOpen) {
             focus.requestFocus()
         }
     }
@@ -112,11 +121,17 @@ fun AssistantPanel(
     val state = voice?.state ?: VoiceSession.State.Idle
 
     Column(modifier) {
+        if (vm.exchanges.isEmpty() && empty != null) {
+            Box(if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth()) {
+                empty { text -> talk.submit(text, spoken = false) }
+            }
+        }
         if (vm.exchanges.isNotEmpty()) {
             LazyColumn(
                 state = list,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = if (fullScreen) PaddingValues(vertical = 12.dp) else PaddingValues(0.dp),
             ) {
                 items(vm.exchanges, key = { it.id }) { exchange ->
                     ExchangeView(
@@ -193,13 +208,14 @@ fun AssistantPanel(
     }
 }
 
+/** One request and its result card. Search results pass no-op actions and settled copies. */
 @Composable
-private fun ExchangeView(
+internal fun ExchangeView(
     exchange: AssistantViewModel.Exchange,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-    onGrant: (ToolResult.NeedsAccess) -> Unit,
-    onRetry: () -> Unit,
+    onConfirm: () -> Unit = {},
+    onCancel: () -> Unit = {},
+    onGrant: (ToolResult.NeedsAccess) -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // What was asked, as a bubble on the right (once, for a multi-part request).

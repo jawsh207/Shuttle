@@ -16,9 +16,16 @@ ordinary activity. It doesn't register as a full voice-interaction service, beca
 would then also make Shuttle your system speech recogniser, replacing whichever speech-to-text
 app you use.
 
-The app's own icon opens **setup** (`MainActivity.kt`): a checklist for choosing Shuttle as
-assistant, granting permissions and special accesses, checking the voice services and their
-settings, and a button to try a command.
+The app's own icon opens **the chat** (`MainActivity.kt`, `ui/ChatScreen.kt`): the same
+conversation full screen, laid out like the other apps in the family, with a search bar at the
+top that searches what was asked and answered, and a settings gear on its right. Until the
+first request it shows a greeting and a few suggestions to tap. It doesn't listen or open the
+keyboard by itself, and it stays put when a command opens another app. The assist gesture
+always opens the small panel, never this chat.
+
+The gear opens **Settings** (`ui/SettingsScreen.kt`), sliding in over the chat: a checklist for
+choosing Shuttle as assistant, granting permissions and special accesses, checking the voice
+services and their settings, and a button to try the assistant panel.
 
 ## Voice
 
@@ -35,8 +42,8 @@ as a new request and the card stays on screen, so nothing is sent on a guess. Ty
 go the same way but are never answered aloud.
 
 The two voice settings (listen when the panel opens, speak replies) live in
-`voice/VoicePrefs.kt`, which also lists the installed recognisers and engines for setup and
-shows which recogniser is in use. Setup's button for changing it opens Language & region
+`voice/VoicePrefs.kt`, which also lists the installed recognisers and engines for Settings and
+shows which recogniser is in use. The Settings button for changing it opens Language & region
 settings, where Android keeps the "Voice input" choice.
 
 ## From words to action
@@ -100,7 +107,9 @@ timers are created in your own clock app, which rings them.
 
 | File | What it is |
 | --- | --- |
-| `MainActivity.kt` | Setup checklist |
+| `MainActivity.kt` | Launcher entry: the full-screen chat, with Settings over it |
+| `ui/ChatScreen.kt` | Full-screen chat: search bar, settings gear, greeting and suggestions |
+| `ui/SettingsScreen.kt` | Assistant role, permissions, special access and voice settings |
 | `assist/AssistActivity.kt` | The assistant panel over other apps |
 | `ui/AssistantPanel.kt` | Conversation, input box and result cards |
 | `ui/AssistantViewModel.kt` | Holds the conversation; runs commands, confirmations and retries |
@@ -108,7 +117,7 @@ timers are created in your own clock app, which rings them.
 | `voice/VoiceSession.kt` | The phone's speech recogniser and text-to-speech engine |
 | `voice/VoicePrefs.kt` | Voice settings; installed recognisers and engines |
 | `engine/Replies.kt` | Reads a spoken yes or no |
-| `ui/theme/Theme.kt` | Material 3 Expressive theme with wallpaper colours |
+| `ui/theme/Theme.kt` | Material 3 Expressive theme with wallpaper colours and Google Sans Flex, as in the other apps |
 | `engine/Tools.kt` | Shared types: tool calls, tool descriptions, results, accesses |
 | `engine/ToolSchemas.kt` | Every tool and its arguments; JSON export |
 | `engine/CommandParser.kt` | Fast-path phrasings to tool calls |
