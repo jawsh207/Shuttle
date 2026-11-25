@@ -236,8 +236,8 @@ Every push to `main` produces an optimized release APK (R8-shrunk, non-debuggabl
 Shuttle's release key; download it from the run's **Artifacts** under **Actions → Build**.
 Each build has a higher version code, so it installs as an update over the last one.
 
-Until the release signing secrets are set (see [Signing](#signing)), each run instead publishes
-**Shuttle-debug-…**: the same optimized build (the `preview` build type, so it opens at full
+Each run also publishes **Shuttle-debug-…** (the only APK until the release signing secrets
+are set; see [Signing](#signing)): the same optimized build (the `preview` build type, so it opens at full
 speed), signed with a throwaway test key that's kept in the repository (`app/debug.keystore`).
 It installs next to release builds as *Shuttle Debug*, and each one updates the last (including
 older, debuggable test builds), keeping the model and chats. It's for testing only: the key is
@@ -268,7 +268,21 @@ CI signs with a key stored in four repository secrets:
 | `SHUTTLE_KEY_ALIAS` | Key alias |
 | `SHUTTLE_KEY_PASSWORD` | Key password |
 
-Without them CI still compiles and runs the tests, but publishes no APK.
+With them, every push publishes **Shuttle-…**, signed with the release key and installing as
+`app.shuttle.assistant`, alongside the **Shuttle-debug-…** test build (`app.shuttle.assistant.debug`,
+throwaway test key), which is published either way. Without them CI still compiles and runs the
+tests, and publishes only the test build.
+
+Release builds are signed with this certificate (SHA-256), which you can check with
+[AppVerifier](https://github.com/soupslurpr/AppVerifier) or `apksigner verify --print-certs`:
+
+```
+A9:98:54:3F:EA:69:10:94:B6:2C:8F:B5:8F:09:13:E2:FD:6A:4C:49:5F:A8:ED:10:30:D0:28:11:D0:0E:15:56
+```
+
+Keep a copy of the keystore and its password somewhere safe and offline (a password manager,
+an encrypted backup). If they're lost, installed copies of Shuttle can't be updated: every
+user would have to uninstall and install again.
 
 ## Roadmap
 

@@ -110,7 +110,7 @@ jobs:
           echo "SHUTTLE_KEYSTORE_FILE=$RUNNER_TEMP/shuttle.jks" >> "$GITHUB_ENV"
 
       # Unit tests, then the optimized (R8, non-debuggable) release build. Without the signing
-      # secrets it still compiles, so code errors show up, but no APK is published.
+      # secrets it still compiles, so code errors show up, but no release APK is published.
       - name: Test and build release APK
         shell: bash
         env:
@@ -164,12 +164,10 @@ jobs:
               print(f"::error title=Build errors {n}/{len(chunks)}::{msg}")
           PYEOF
 
-      # No release key set yet: build the test APK (the optimized release build, signed with the
-      # throwaway test key committed at app/debug.keystore), so every push still gives
-      # something to install and test. It installs alongside release builds (its package name
-      # ends in .debug) and updates a debug build in place.
-      - name: Build test APK (no release key)
-        if: env.HAS_SIGNING != 'true'
+      # The test APK, on every run: the optimized release build signed with the throwaway test
+      # key committed at app/debug.keystore. It installs as app.shuttle.assistant.debug
+      # ("Shuttle Debug"), next to release builds, and updates the last test build in place.
+      - name: Build test APK
         shell: bash
         run: |
           set -o pipefail
@@ -177,10 +175,11 @@ jobs:
           mkdir -p out-debug
           cp app/build/outputs/apk/preview/app-preview.apk "out-debug/Shuttle-debug-${SHUTTLE_VERSION_NAME}.apk"
           ls -la out-debug
-          echo "::warning title=Test build only::No release signing key is set, so this run published a test APK signed with the throwaway test key. Add the SHUTTLE_KEYSTORE_* secrets (README › Signing) for release builds."
+          if [ "$HAS_SIGNING" != "true" ]; then
+            echo "::warning title=Test build only::No release signing key is set, so only the test APK was published. Add the SHUTTLE_KEYSTORE_* secrets (README › Signing) for release builds."
+          fi
 
       - uses: actions/upload-artifact@v4
-        if: env.HAS_SIGNING != 'true'
         with:
           name: Shuttle-debug-${{ env.SHUTTLE_VERSION_NAME }}
           path: out-debug/*.apk
