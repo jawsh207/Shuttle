@@ -44,8 +44,14 @@ object DeviceTools {
         }
     }
 
+    /**
+     * Tools that need the network and run in the background, handled by the assistant itself
+     * rather than here (Android forbids network calls on the main thread).
+     */
+    val background = setOf("web_search")
+
     /** Names in [ToolSchemas] with no implementation; a unit test keeps this empty. */
-    val missing: List<String> get() = ToolSchemas.all.map { it.name }.filter { it !in runners }
+    val missing: List<String> get() = ToolSchemas.all.map { it.name }.filter { it !in runners && it !in background }
 
     fun run(context: Context, call: ToolCall): ToolResult {
         val runner = runners[call.name] ?: return ToolResult.Failed("I don't know how to do that yet.")

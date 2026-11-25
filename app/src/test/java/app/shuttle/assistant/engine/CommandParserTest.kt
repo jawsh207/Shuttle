@@ -275,6 +275,16 @@ class CommandParserTest {
         check("brightness up", call("brightness", "level" to "up"))
     }
 
+    @Test fun webSearch() {
+        check("search for pizza dough recipes", call("web_search", "query" to "pizza dough recipes"))
+        check("look up who won the World Series", call("web_search", "query" to "who won the World Series"))
+        check("search the web for GrapheneOS release notes", call("web_search", "query" to "GrapheneOS release notes"))
+        check("google best hiking boots", call("web_search", "query" to "best hiking boots"))
+        check("find out the price of a Pixel 10 online", call("web_search", "query" to "the price of a Pixel 10"))
+        check("find a pharmacy nearby", call("navigate", "destination" to "a pharmacy near me"))
+        check("search my chats", null)
+    }
+
     @Test fun severalCommandsAtOnce() {
         assertEquals(
             listOf(call("wifi", "state" to "off"), call("bluetooth", "state" to "off")),

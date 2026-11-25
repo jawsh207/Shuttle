@@ -29,9 +29,10 @@ class ModelPromptsTest {
 
     @Test fun toolListIsCompact() {
         assertTrue(ModelPrompts.tools.all { it.startsWith("{\"name\": ") && !it.contains('\n') })
-        // Far smaller than the full list (~7 KB): it's read before every first answer.
+        // Read once per model and then saved, but the first read happens on the phone's CPU,
+        // so growth should be a choice: raise this deliberately, not by accident.
         val size = ModelPrompts.prefix().length
-        assertTrue("prefix is $size chars", size < 6000)
+        assertTrue("prefix is $size chars", size < 7500)
     }
 
     @Test fun promptStartIsStableAndDatedOnly() {

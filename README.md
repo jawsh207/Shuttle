@@ -31,8 +31,8 @@ off and deletes every saved chat.
 
 ## What it does today
 
-Shuttle understands spoken or typed commands for the phone itself. Everything runs on the
-device; nothing is sent anywhere.
+Shuttle understands spoken or typed commands for the phone itself. They all run on the device;
+nothing is sent anywhere.
 
 | Area | Examples |
 | --- | --- |
@@ -70,7 +70,7 @@ or to say yes or no.
 Anything the commands above don't cover (questions, conversation, unusual wordings) goes to
 **Granite 4.2 3B**, IBM's Apache 2.0 model, running entirely on the phone through
 [llama.cpp](https://github.com/ggml-org/llama.cpp). There's no account, no API key and no usage
-limit, and nothing you ask leaves the phone.
+limit, and nothing you ask leaves the phone, except the words of a web search (below).
 
 - **Download once:** Settings › Model › Download (2.1 GB, Wi-Fi only by default). It continues
   with Shuttle closed, shows progress in the notification shade, resumes after a dropped
@@ -92,9 +92,23 @@ limit, and nothing you ask leaves the phone.
   they're written, and **Stop** works at any point.
 - **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
   after ten quiet minutes.
-- **No internet yet:** the model answers from what it learned in training, so for things that
-  change (who holds an office, news, prices) it says its answer may be out of date (see
-  [Roadmap](#roadmap)).
+- **Knowledge date:** the model doesn't know exactly when its training data ends, so it's told
+  never to name a cutoff year.
+
+## Web search
+
+For anything current ("who's the current president of France?", "latest GrapheneOS release")
+the model searches the web first and answers from the results, which are listed as **Sources**
+under the answer; tap one to open it. You can also ask outright: "search for…", "look up…",
+"google…", "find out … online". Before the model is downloaded, a search shows the results
+themselves.
+
+- **Sources:** DuckDuckGo's plain-HTML results, then Wikipedia (in the phone's language). No
+  account, key or server of Shuttle's own.
+- **What's sent:** only the search words, never the rest of the chat.
+- **Limits:** DuckDuckGo sometimes answers with a "prove you're not a robot" page instead of
+  results, especially to unusual networks; Shuttle then uses Wikipedia alone. Sources aren't
+  kept when a chat is saved, only the answer.
 
 ## Voice
 
@@ -133,7 +147,7 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
-| Internet (GrapheneOS: the Network permission in App info) | Downloading the model once, and checking `models/manifest.json` for model updates. Requests never go online |
+| Internet (GrapheneOS: the Network permission in App info) | Downloading the model once, checking `models/manifest.json` for model updates, and web searches (only the search words are sent) |
 | Wi-Fi and network state (granted at install) | Answering "is Wi-Fi on?" and "is mobile data on?" |
 | Notifications (Android 13+, asked when you tap Download) | Showing the model download's progress |
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
@@ -186,8 +200,7 @@ Without them CI still compiles and runs the tests, but publishes no APK.
 
 ## Roadmap
 
-1. **Live information:** web search and page reading, with sources, so the model can answer
-   questions about current events.
+1. **Reading pages:** opening the top search results for fuller answers.
 2. **More tools:** notification reading and replies, calendar, screen text.
 
 ## License

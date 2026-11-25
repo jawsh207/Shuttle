@@ -56,6 +56,14 @@ object ModelPrompts {
         keep.forEach { name -> add(ToolSchemas.find(name)!!) }
         add(
             ToolSpec(
+                "web_search",
+                "Search the web. Use it for anything current or that you're unsure of: news, who holds a position now, " +
+                    "recent events, prices, schedules, releases, or facts that may have changed.",
+                listOf(Param("query", ParamType.STRING, "A short search query.")),
+            ),
+        )
+        add(
+            ToolSpec(
                 "send_sms", "Send a text message. The user confirms before it is sent.",
                 listOf(
                     Param("contact", ParamType.STRING, "Contact name or number."),
@@ -75,8 +83,10 @@ object ModelPrompts {
             "and when asked to continue, expand or change an answer, build on what you said before instead of starting over. " +
             "You can also control the phone with the functions below; call one only when the user wants something done on the phone, " +
             "and never claim an action happened unless you called a function for it. " +
-            "You can't browse the internet and your knowledge has a cutoff, so for things that change " +
-            "(who holds an office, news, prices, weather, scores) give what you know and say it may be out of date."
+            "Your own knowledge may be out of date, so for anything current or likely to have changed " +
+            "(who holds an office, news, recent events, prices, scores) call web_search first and answer from its results. " +
+            "You don't know exactly when your training data ends, so never state a cutoff date or year; " +
+            "if asked, say you can't tell exactly and that recent events may be missing."
 
     /** The date, sent after the shared start so the start never changes. */
     fun note(today: LocalDate = LocalDate.now()): String =

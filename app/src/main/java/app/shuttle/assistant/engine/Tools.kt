@@ -52,8 +52,11 @@ enum class Access(val label: String, val permissions: List<String>) {
 sealed interface ToolResult {
     val text: String
 
-    /** Finished. [closePanel] is set when the tool opened another app or screen. */
-    data class Done(override val text: String, val closePanel: Boolean = false) : ToolResult
+    /**
+     * Finished. [closePanel] is set when the tool opened another app or screen; [sources] are
+     * the web pages an answer came from, shown under it.
+     */
+    data class Done(override val text: String, val closePanel: Boolean = false, val sources: List<Source> = emptyList()) : ToolResult
 
     /**
      * Needs a yes from the user first (calls, texts). Confirming runs [call] again with
@@ -68,3 +71,8 @@ sealed interface ToolResult {
 }
 
 const val CONFIRMED = "confirmed"
+
+/** A web page an answer drew on. */
+data class Source(val title: String, val url: String) {
+    val site: String get() = url.substringAfter("://").substringBefore('/').removePrefix("www.")
+}

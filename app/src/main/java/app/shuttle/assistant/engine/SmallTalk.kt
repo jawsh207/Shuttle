@@ -18,7 +18,7 @@ object SmallTalk {
     const val HELP =
         "I can switch things like the flashlight, Do Not Disturb and silent mode, change brightness " +
             "and volume, control music, set alarms and timers, call and text your contacts, open apps, " +
-            "give directions, tell you the time or your battery level, and check what's switched on. " +
+            "give directions, tell you the time or your battery level, check what's switched on, and search the web. " +
             "Try \"set a timer for 10 minutes\" or \"text Sam saying I'm on my way\"."
 
     fun reply(input: String): Reply? {

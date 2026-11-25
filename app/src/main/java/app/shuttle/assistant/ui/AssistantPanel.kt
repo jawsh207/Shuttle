@@ -1,5 +1,7 @@
 package app.shuttle.assistant.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -50,8 +52,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.shuttle.assistant.engine.Access
+import app.shuttle.assistant.engine.Source
 import app.shuttle.assistant.engine.ToolResult
 import app.shuttle.assistant.tools.accessSettingsIntent
 import app.shuttle.assistant.tools.hasAccess
@@ -266,6 +270,8 @@ private fun ResultCard(
             } else {
                 Text(result.text, style = MaterialTheme.typography.bodyLarge)
             }
+            val sources = (result as? ToolResult.Done)?.sources.orEmpty()
+            if (sources.isNotEmpty()) Sources(sources)
             if (!exchange.settled && !exchange.thinking) {
                 when (result) {
                     is ToolResult.Confirm -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -279,6 +285,28 @@ private fun ResultCard(
                         if (!result.access.isRuntimePermission) TextButton(onClick = onRetry) { Text("Try again") }
                     }
                     else -> Unit
+                }
+            }
+        }
+    }
+}
+
+/** The web pages an answer came from; tapping one opens it in the browser. */
+@Composable
+private fun Sources(sources: List<Source>) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Sources", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        sources.forEachIndexed { i, source ->
+            Surface(
+                onClick = { context.launch(Intent(Intent.ACTION_VIEW, Uri.parse(source.url))) },
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text("${i + 1}. ${source.title}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(source.site, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

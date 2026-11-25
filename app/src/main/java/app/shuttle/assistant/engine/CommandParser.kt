@@ -403,6 +403,16 @@ object CommandParser {
             ToolCall("navigate", mapOf("destination" to "${it.groupValues[1]} near me"))
         })
 
+        // Web search (after directions, so "find a pharmacy near me" stays a map search)
+        val web = "(?:the\\s+)?(?:web|internet|net|online)"
+        add(Rule("(?:search|look|check)(?:\\s+up)?\\s+$web\\s+(?:for\\s+)?(.+)", verbatim = true) { ToolCall("web_search", mapOf("query" to it.groupValues[1].trim())) })
+        add(Rule("(?:search|google|duckduckgo|look up|lookup)\\s+(?:for\\s+)?(?!(?:my\\s+)?(?:chats?|messages|contacts)\\b)(.+)", verbatim = true) {
+            ToolCall("web_search", mapOf("query" to it.groupValues[1].trim().removeSuffix("?").trim()))
+        })
+        add(Rule("(?:find|look)\\s+(?:out\\s+)?(.+?)\\s+(?:online|on the web|on the internet)", verbatim = true) {
+            ToolCall("web_search", mapOf("query" to it.groupValues[1].trim()))
+        })
+
         // Status
         val charge = "(?:battery|charge|juice|power)"
         add(Rule("(?:what(?:'s| is)\\s+(?:my\\s+|the\\s+)?)?battery(?:\\s+(?:level|status|percentage|percent|life|at))?") { ToolCall("battery_status") })

@@ -89,6 +89,10 @@ object ToolSchemas {
         ),
         ToolSpec("battery_status", "Report the battery level and whether the phone is charging."),
         ToolSpec(
+            "web_search", "Search the web and read the top results.",
+            listOf(Param("query", ParamType.STRING, "What to search for.")),
+        ),
+        ToolSpec(
             "status", "Tell whether a setting is on, or its current level. Offers to switch it.",
             listOf(Param("setting", ParamType.STRING, "Which setting, or all for a summary.", options = STATUS_SETTINGS)),
         ),

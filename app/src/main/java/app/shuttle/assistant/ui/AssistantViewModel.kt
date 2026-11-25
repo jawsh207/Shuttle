@@ -1,6 +1,8 @@
 package app.shuttle.assistant.ui
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -10,13 +12,18 @@ import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.engine.CONFIRMED
 import app.shuttle.assistant.engine.CommandParser
 import app.shuttle.assistant.engine.SmallTalk
+import app.shuttle.assistant.engine.Source
 import app.shuttle.assistant.engine.ToolCall
 import app.shuttle.assistant.engine.ToolResult
 import app.shuttle.assistant.llm.GranitePrompt
 import app.shuttle.assistant.llm.LocalModel
 import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.llm.ModelPrompts
+import app.shuttle.assistant.search.SearchResult
+import app.shuttle.assistant.search.SearchResults
+import app.shuttle.assistant.search.WebSearch
 import app.shuttle.assistant.tools.DeviceTools
+import java.util.concurrent.Executors
 
 /**
  * The conversation in the assistant panel: what the user asked and what came back.
@@ -25,7 +32,9 @@ import app.shuttle.assistant.tools.DeviceTools
  * recognise gets a short social reply when it's small talk ([SmallTalk]); anything else goes
  * to the on-device model once it's downloaded ([ModelManager], [LocalModel]). The model's
  * reply streams into its card, and any tools it asks for run through the same device tools,
- * so calls and texts still stop at a confirmation card. Before the model is downloaded, the
+ * so calls and texts still stop at a confirmation card. A web search (asked for outright, or
+ * requested by the model) runs in the background, then the model answers from the results,
+ * which are listed as sources under the answer; without the model, the results are shown. Before the model is downloaded, the
  * answer says so and points to Settings.
  * Tools are run with the activity as context so they can open panels and other apps over it.
  *
@@ -141,6 +150,10 @@ class AssistantViewModel : ViewModel() {
         val inModelChat = model != null && exchanges.lastOrNull()?.fromModel == true
         if (inModelChat && CommandParser.isFollowUp(asked)) return askModel(context, asked, model!!, after)
         val calls = CommandParser.parseAll(asked)
+        calls.singleOrNull()?.takeIf { it.name == "web_search" }?.let { search ->
+            val query = search.args["query"] ?: asked
+            return if (model != null) askModel(context, asked, model, after, search = query) else searchOnly(asked, query, after)
+        }
         if (calls.isNotEmpty()) {
             var close = false
             calls.forEachIndexed { i, call ->
@@ -191,35 +204,63 @@ class AssistantViewModel : ViewModel() {
 
     // --- The model -------------------------------------------------------------------------
 
-    private fun askModel(context: Context, asked: String, model: ModelManager.State.Ready, after: (Boolean) -> Unit) {
-        val history = conversation()
+    /**
+     * Answers with the model. With [search], the web is searched first and the model answers
+     * from the results; otherwise the model may ask for a search itself (once per question).
+     */
+    private fun askModel(context: Context, asked: String, model: ModelManager.State.Ready, after: (Boolean) -> Unit, search: String? = null) {
+        val messages = conversation() + GranitePrompt.Message(GranitePrompt.Role.USER, asked)
         val placeholder = Exchange(nextId++, asked, ToolResult.Done(""), thinking = true)
         exchanges += placeholder
         thinking = true
         stopped = false
-        val prompt = GranitePrompt.build(
-            ModelPrompts.system(), ModelPrompts.tools,
-            history + GranitePrompt.Message(GranitePrompt.Role.USER, asked),
-            note = ModelPrompts.note(),
-        )
+        if (search != null) {
+            // Asked to search outright: do it, then let the model read the results as if it
+            // had asked for them itself.
+            searchThenAnswer(context, model, messages, placeholder.id, search, searchCall(search), after)
+        } else {
+            generateStep(context, asked, model, messages, placeholder.id, round = 0, sources = emptyList(), after = after)
+        }
+    }
+
+    private fun searchCall(query: String) =
+        "<tool_call>\n<function=web_search>\n<parameter=query>\n$query\n</parameter>\n</function>\n</tool_call>"
+
+    private fun generateStep(
+        context: Context,
+        asked: String,
+        model: ModelManager.State.Ready,
+        messages: List<GranitePrompt.Message>,
+        placeholderId: Int,
+        round: Int,
+        sources: List<Source>,
+        after: (Boolean) -> Unit,
+    ) {
+        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note())
         LocalModel.generate(model.file, prompt) { event ->
             when (event) {
-                is LocalModel.Event.Status -> replace(placeholder.id) { it.copy(status = event.text) }
-                is LocalModel.Event.Text -> replace(placeholder.id) { it.copy(result = ToolResult.Done(GranitePrompt.visibleText(event.raw))) }
+                is LocalModel.Event.Status -> replace(placeholderId) { it.copy(status = if (round > 0) "Reading the results…" else event.text) }
+                is LocalModel.Event.Text -> replace(placeholderId) { it.copy(result = ToolResult.Done(GranitePrompt.visibleText(event.raw), sources = sources)) }
                 is LocalModel.Event.Failed -> {
-                    replace(placeholder.id) { it.copy(result = ToolResult.Failed(event.message), thinking = false) }
+                    replace(placeholderId) { it.copy(result = ToolResult.Failed(event.message), thinking = false) }
                     thinking = false
                     persist()
                     after(false)
                 }
                 is LocalModel.Event.Finished -> {
-                    thinking = false
                     val text = GranitePrompt.visibleText(event.raw)
                     val calls = GranitePrompt.toolCalls(event.raw).mapNotNull(ModelPrompts::sanitize)
-                    if (calls.isEmpty()) {
-                        replace(placeholder.id) {
+                    val search = calls.firstOrNull { it.name == "web_search" }
+                    if (search != null && round == 0 && !stopped) {
+                        val query = search.args["query"]?.takeIf { it.isNotBlank() } ?: asked
+                        return@generate searchThenAnswer(context, model, messages, placeholderId, query, event.raw.trim(), after)
+                    }
+                    thinking = false
+                    val actions = calls.filter { it.name != "web_search" }
+                    if (actions.isEmpty()) {
+                        replace(placeholderId) {
                             it.copy(
-                                result = ToolResult.Done(text.ifBlank { if (stopped) STOPPED else "I don't have an answer for that." }),
+                                result = ToolResult.Done(text.ifBlank { if (stopped) STOPPED else "I don't have an answer for that." }, sources = sources),
                                 thinking = false,
                                 fromModel = text.isNotBlank(),
                             )
@@ -227,16 +268,16 @@ class AssistantViewModel : ViewModel() {
                         persist()
                         return@generate after(false)
                     }
-                    // The model asked for tools: run them like any other request. Calls and
-                    // texts still stop at a confirmation card.
+                    // The model asked for phone tools: run them like any other request. Calls
+                    // and texts still stop at a confirmation card.
                     var close = false
                     if (text.isBlank()) {
-                        val i = exchanges.indexOfFirst { it.id == placeholder.id }
+                        val i = exchanges.indexOfFirst { it.id == placeholderId }
                         if (i >= 0) exchanges.removeAt(i)
                     } else {
-                        replace(placeholder.id) { it.copy(result = ToolResult.Done(text), thinking = false, fromModel = true) }
+                        replace(placeholderId) { it.copy(result = ToolResult.Done(text), thinking = false, fromModel = true) }
                     }
-                    calls.forEachIndexed { i, call ->
+                    actions.forEachIndexed { i, call ->
                         val result = DeviceTools.run(context, call)
                         val askedHere = if (i == 0 && text.isBlank()) asked else ""
                         exchanges += Exchange(nextId++, askedHere, result)
@@ -246,6 +287,82 @@ class AssistantViewModel : ViewModel() {
                     after(close)
                 }
             }
+        }
+    }
+
+    /** Searches, then has the model answer from the results (shown as sources under it). */
+    private fun searchThenAnswer(
+        context: Context,
+        model: ModelManager.State.Ready,
+        messages: List<GranitePrompt.Message>,
+        placeholderId: Int,
+        query: String,
+        call: String,
+        after: (Boolean) -> Unit,
+    ) {
+        val asked = exchanges.firstOrNull { it.id == placeholderId }?.asked ?: query
+        replace(placeholderId) { it.copy(result = ToolResult.Done(""), status = "Searching the web…") }
+        searchWeb(query) { results, error ->
+            if (stopped) {
+                replace(placeholderId) { it.copy(result = ToolResult.Done(STOPPED), thinking = false) }
+                thinking = false
+                persist()
+                return@searchWeb after(false)
+            }
+            if (error != null) {
+                replace(placeholderId) { it.copy(result = ToolResult.Failed(error), thinking = false) }
+                thinking = false
+                persist()
+                return@searchWeb after(false)
+            }
+            val found = results.orEmpty()
+            val next = messages +
+                GranitePrompt.Message(GranitePrompt.Role.ASSISTANT, call) +
+                GranitePrompt.Message(GranitePrompt.Role.TOOL, SearchResults.forModel(query, found))
+            generateStep(context, asked, model, next, placeholderId, round = 1, sources = found.map { Source(it.title, it.url) }, after = after)
+        }
+    }
+
+    /** Before the model is downloaded, a search shows the results themselves. */
+    private fun searchOnly(asked: String, query: String, after: (Boolean) -> Unit) {
+        val placeholder = Exchange(nextId++, asked, ToolResult.Done(""), thinking = true, status = "Searching the web…")
+        exchanges += placeholder
+        thinking = true
+        stopped = false
+        searchWeb(query) { results, error ->
+            thinking = false
+            val result = when {
+                stopped -> ToolResult.Done(STOPPED)
+                error != null -> ToolResult.Failed(error)
+                results.isNullOrEmpty() -> ToolResult.Failed("I couldn't find anything for \"$query\".")
+                else -> {
+                    val top = results.take(5)
+                    ToolResult.Done(
+                        "Here's what I found for \"$query\":\n\n" + top.mapIndexed { i, r -> "${i + 1}. ${r.title}: ${r.snippet.take(220)}" }.joinToString("\n\n"),
+                        sources = top.map { Source(it.title, it.url) },
+                    )
+                }
+            }
+            replace(placeholder.id) { it.copy(result = result, thinking = false) }
+            persist()
+            after(false)
+        }
+    }
+
+    private val background = Executors.newSingleThreadExecutor { r -> Thread(r, "shuttle-search") }
+    private val mainThread = Handler(Looper.getMainLooper())
+
+    /** Runs [WebSearch] off the main thread; [done] gets results or a message for the user. */
+    private fun searchWeb(query: String, done: (List<SearchResult>?, String?) -> Unit) {
+        background.execute {
+            val (results, error) = try {
+                WebSearch.search(query) to null
+            } catch (_: WebSearch.Blocked) {
+                null to "Shuttle isn't allowed to use the network, so it can't search. Turn on its Network permission in App info."
+            } catch (e: Exception) {
+                null to "The search didn't work (${e.message ?: "no connection"}). Check your connection and try again."
+            }
+            mainThread.post { done(results, error) }
         }
     }
 

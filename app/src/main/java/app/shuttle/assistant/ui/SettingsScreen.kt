@@ -403,8 +403,8 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
             onChanged()
         }
         Text(
-            "On GrapheneOS, the download needs Shuttle's Network permission (App info › Permissions). " +
-                "It's only used for the model; requests never leave the phone.",
+            "On GrapheneOS, the download and web search need Shuttle's Network permission (App info › Permissions). " +
+                "It's only used for the model and web searches; everything else stays on the phone.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),

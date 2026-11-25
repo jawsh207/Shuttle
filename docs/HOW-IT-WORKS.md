@@ -128,11 +128,20 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   reads tool calls out of the reply, hiding any stray thinking markers. `llm/ModelPrompts.kt`
   holds the instructions it's given: a general assistant first (questions, explanations,
   recipes, advice), concise, using the phone's tools only when asked to do something on the
-  phone, and saying its knowledge may be out of date for things that change, since it can't
-  go online. Earlier turns of the chat (roughly the last 3,000 tokens) go along as context, and
+  phone, searching the web for anything current, and never naming a knowledge cutoff year
+  (it can't know it). Earlier turns of the chat (roughly the last 3,000 tokens) go along as context, and
   the model is told to treat short or vague messages as follow-ups and to build on its earlier
   answers when asked to continue, expand or change one. Only real answers are sent: Shuttle's
   own notes (errors, "Stopped.") are left out so the model doesn't repeat them.
+- **Searching the web.** `search/WebSearch.kt` asks DuckDuckGo's plain-HTML results page, then
+  Wikipedia's search API (in the phone's language); `search/SearchResults.kt` reads
+  DuckDuckGo's page (skipping ads, and spotting its "are you a robot?" page, which counts as no
+  results) and writes the results out for the model. The model is told to search for anything
+  current or likely to have changed. When it asks for `web_search`, or the user says "search
+  for…"/"look up…", the search runs in the background ("Searching the web…"), the results go
+  back to the model as the tool's answer, and it writes the reply from them, with the pages
+  listed as sources under it. One search per question. Only the search words are sent. Before
+  the model is downloaded, a search shows the results themselves.
 - **Follow-ups versus commands.** Right after the model has answered, a few words that are
   otherwise phone commands ("continue", "next", "go back", "again") go to the model instead, so
   "continue" after a long answer carries on with it rather than starting the music; small talk
@@ -175,6 +184,8 @@ timers are created in your own clock app, which rings them.
 | --- | --- |
 | `MainActivity.kt` | Launcher entry: the full-screen chat, with Settings over it |
 | `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
+| `search/WebSearch.kt` | Web search: DuckDuckGo's HTML results, then Wikipedia |
+| `search/SearchResults.kt` | Reading DuckDuckGo's results page; results written out for the model |
 | `llm/LlamaEngine.kt` | Kotlin side of the native bridge to llama.cpp |
 | `llm/LocalModel.kt` | Loads the model when needed, streams replies, unloads when idle |
 | `llm/ModelManager.kt` | The model's state: download, check, install, update, delete |
