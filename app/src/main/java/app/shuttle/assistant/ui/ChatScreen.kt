@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -95,6 +96,9 @@ fun ChatScreen(
     var chats by remember { mutableStateOf(emptyList<ChatStore.Chat>()) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // Back from the chat list or search returns to the chat; only from there does it leave
+    // the app. (Settings, drawn over this, handles its own back first.)
+    BackHandler(enabled = query != null) { query = null }
     // Re-read the saved chats each time the list opens.
     LaunchedEffect(query == null) { if (query != null) chats = store.list() }
 
