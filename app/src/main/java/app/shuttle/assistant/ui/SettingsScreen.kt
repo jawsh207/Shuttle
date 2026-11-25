@@ -260,6 +260,8 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 val special = listOf(
                     Access.DO_NOT_DISTURB to "Turn Do Not Disturb and silent mode on and off.",
                     Access.SYSTEM_SETTINGS to "Change brightness and auto-rotate.",
+                    Access.QUICK_SETTINGS to "Optional. Switch Wi-Fi, mobile data, Bluetooth, airplane mode, battery saver and any other " +
+                        "Quick Settings tile directly, by tapping it for you. An accessibility service that only looks at the system's own screens.",
                 )
                 Section(
                     "Special access",
@@ -273,8 +275,9 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                         }
                     }
                     Text(
-                        "Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app without root, " +
-                            "so Shuttle opens the system panel for you to tap.",
+                        "Without Quick Settings control, Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app " +
+                            "without root, so Shuttle opens the system panel for you to tap. If Android says the setting is " +
+                            "restricted, open Shuttle's App info, tap ⋮ and choose Allow restricted settings first.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),

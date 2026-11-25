@@ -19,7 +19,9 @@ import app.shuttle.assistant.engine.ToolSchemas
  * Every implementation uses only public Android APIs that a normal app is allowed to use, with
  * no root or Shizuku. Where Android doesn't let apps flip a switch directly (Wi-Fi, Bluetooth
  * off, mobile data, airplane mode), the tool opens the system panel or settings page so the
- * user can tap once; the result text says so.
+ * user can tap once; the result text says so. With Quick Settings control on, those switches
+ * (and any tile) are tapped in Quick Settings instead, which takes a moment, so the assistant
+ * runs them through [QuickTiles.run] rather than [run].
  */
 object DeviceTools {
 
@@ -30,6 +32,7 @@ object DeviceTools {
         putAll(Clock.runners)
         putAll(Apps.runners)
         putAll(Status.runners)
+        putAll(QuickTiles.runners)
     }
 
     /**
@@ -90,6 +93,7 @@ fun Context.hasAccess(access: Access): Boolean = when (access) {
     Access.DO_NOT_DISTURB ->
         getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
     Access.SYSTEM_SETTINGS -> Settings.System.canWrite(this)
+    Access.QUICK_SETTINGS -> QuickTiles.enabled(this)
     else -> access.permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
 }
 
@@ -97,6 +101,7 @@ fun Context.hasAccess(access: Access): Boolean = when (access) {
 fun Context.accessSettingsIntent(access: Access): Intent? = when (access) {
     Access.DO_NOT_DISTURB -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
     Access.SYSTEM_SETTINGS -> Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName"))
+    Access.QUICK_SETTINGS -> QuickTiles.settingsIntent(this)
     else -> null
 }
 

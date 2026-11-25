@@ -182,6 +182,18 @@ switch Wi-Fi, mobile data or NFC, so those tools open the system's floating pane
 setting. Bluetooth on uses the system's confirmation prompt. Bluetooth off, airplane mode,
 location, hotspot and dark theme open their settings pages. Everything else changes directly.
 
+The optional **Quick Settings control** (`tools/QuickTilesService.kt`, an accessibility
+service) gets around that the way a person would. With it on, those switches and the
+`quick_setting` tool (any tile by name) are done by `tools/QuickTiles.kt`. It opens Quick
+Settings, finds the tile by its label (`engine/QuickTileNames.kt` matches names and reads
+"On"/"Off"), pages through if needed, taps it only if that changes anything, checks the
+result and closes the shade. A tile that opens a dialog (Internet, Bluetooth) has the right
+switch in the dialog used instead. This watches the screen for a second or two, so it runs on
+its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
+several commands in one sentence wait for each other. If no tile matches, a switch falls back
+to its panel or settings page. The service hears only the system UI's events and reads the
+shade only while carrying out a request.
+
 Directions use a standard map link, so they open in whatever maps app you have. Alarms and
 timers are created in your own clock app, which rings them.
 
@@ -221,4 +233,7 @@ timers are created in your own clock app, which rings them.
 | `engine/Quantities.kt` | Number words, clock times, durations |
 | `engine/SmallTalk.kt` | Replies to hello, thanks, "what can you do?", "never mind" |
 | `tools/*.kt` | The device tools, grouped as above (`Status.kt` answers "is it on?") |
+| `tools/QuickTiles.kt` | Tapping Quick Settings tiles: finding, reading, tapping, dialogs |
+| `tools/QuickTilesService.kt` | The optional accessibility service that makes the tapping possible |
+| `engine/QuickTileNames.kt` | Tile labels for each switch, name matching, reading on/off |
 | `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |

@@ -23,6 +23,7 @@ import app.shuttle.assistant.search.SearchResult
 import app.shuttle.assistant.search.SearchResults
 import app.shuttle.assistant.search.WebSearch
 import app.shuttle.assistant.tools.DeviceTools
+import app.shuttle.assistant.tools.QuickTiles
 import java.util.concurrent.Executors
 
 /**
@@ -166,14 +167,7 @@ class AssistantViewModel : ViewModel() {
             return if (model != null) askModel(context, asked, model, after, search = query) else searchOnly(asked, query, after)
         }
         if (calls.isNotEmpty()) {
-            var close = false
-            calls.forEachIndexed { i, call ->
-                val result = DeviceTools.run(context, call)
-                exchanges += Exchange(nextId++, if (i == 0) asked else "", result)
-                if ((result as? ToolResult.Done)?.closePanel == true) close = true
-            }
-            persist()
-            return after(close)
+            return runCalls(context, calls, asked, after)
         }
         if (!inModelChat) SmallTalk.reply(asked)?.let { chat ->
             exchanges += Exchange(nextId++, asked, ToolResult.Done(chat.text, closePanel = chat.close))
@@ -281,21 +275,13 @@ class AssistantViewModel : ViewModel() {
                     }
                     // The model asked for phone tools: run them like any other request. Calls
                     // and texts still stop at a confirmation card.
-                    var close = false
                     if (text.isBlank()) {
                         val i = exchanges.indexOfFirst { it.id == placeholderId }
                         if (i >= 0) exchanges.removeAt(i)
                     } else {
                         replace(placeholderId) { it.copy(result = ToolResult.Done(text), thinking = false, fromModel = true) }
                     }
-                    actions.forEachIndexed { i, call ->
-                        val result = DeviceTools.run(context, call)
-                        val askedHere = if (i == 0 && text.isBlank()) asked else ""
-                        exchanges += Exchange(nextId++, askedHere, result)
-                        if ((result as? ToolResult.Done)?.closePanel == true) close = true
-                    }
-                    persist()
-                    after(close)
+                    runCalls(context, actions, if (text.isBlank()) asked else "", after)
                 }
             }
         }
@@ -413,6 +399,37 @@ class AssistantViewModel : ViewModel() {
         return messages
     }
 
+    /**
+     * Runs [calls] one after another, the first card showing [firstAsked]. Quick Settings
+     * taps ([QuickTiles]) take a moment, so each shows a card that fills in when it's done,
+     * and the next call waits for it; [after] runs once all are finished.
+     */
+    private fun runCalls(context: Context, calls: List<ToolCall>, firstAsked: String, after: (Boolean) -> Unit) {
+        var close = false
+        fun step(i: Int) {
+            if (i == calls.size) {
+                persist()
+                return after(close)
+            }
+            val call = calls[i]
+            val askedHere = if (i == 0) firstAsked else ""
+            if (QuickTiles.handles(call)) {
+                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = "Tapping Quick Settings…")
+                exchanges += placeholder
+                QuickTiles.run(context, call) { result ->
+                    replace(placeholder.id) { it.copy(result = result, thinking = false) }
+                    step(i + 1)
+                }
+            } else {
+                val result = DeviceTools.run(context, call)
+                exchanges += Exchange(nextId++, askedHere, result)
+                if ((result as? ToolResult.Done)?.closePanel == true) close = true
+                step(i + 1)
+            }
+        }
+        step(0)
+    }
+
     private fun replace(id: Int, change: (Exchange) -> Exchange) {
         val i = exchanges.indexOfFirst { it.id == id }
         if (i >= 0) exchanges[i] = change(exchanges[i])
@@ -441,6 +458,10 @@ class AssistantViewModel : ViewModel() {
 
     /** A follow-up result for the same request, so no new "asked" bubble. */
     private fun rerun(context: Context, call: ToolCall): Boolean {
+        if (QuickTiles.handles(call)) {
+            runCalls(context, listOf(call), "") {}
+            return false
+        }
         val result = DeviceTools.run(context, call)
         exchanges += Exchange(nextId++, "", result)
         persist()

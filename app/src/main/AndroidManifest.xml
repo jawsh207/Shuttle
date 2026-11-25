@@ -92,5 +92,20 @@
             android:name=".llm.ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Optional Quick Settings control: taps tiles that apps can't switch themselves
+             (tools/QuickTilesService.kt). Off until the user turns it on in Accessibility. -->
+        <service
+            android:name=".tools.QuickTilesService"
+            android:exported="true"
+            android:label="@string/quick_tiles_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/quick_tiles_service" />
+        </service>
     </application>
 </manifest>

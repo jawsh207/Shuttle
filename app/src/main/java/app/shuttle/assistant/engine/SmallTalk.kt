@@ -16,7 +16,7 @@ object SmallTalk {
     private fun matches(s: String, vararg patterns: String) = patterns.any { Regex(it).matches(s) }
 
     const val HELP =
-        "I can switch things like the flashlight, Do Not Disturb and silent mode, change brightness " +
+        "I can switch things like the flashlight, Do Not Disturb, silent mode and Quick Settings tiles, change brightness " +
             "and volume, control music, set alarms and timers, call and text your contacts, open apps, " +
             "give directions, tell you the time or your battery level, check what's switched on, and search the web. " +
             "Try \"set a timer for 10 minutes\" or \"text Sam saying I'm on my way\"."

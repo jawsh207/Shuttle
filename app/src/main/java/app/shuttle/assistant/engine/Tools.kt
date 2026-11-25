@@ -34,7 +34,8 @@ val StateParam = Param("state", ParamType.STRING, "Whether to turn it on or off.
 
 /**
  * Something the user has to grant before a tool can work. Runtime permissions are asked for
- * with the normal Android dialog; the two special accesses are switches in Settings.
+ * with the normal Android dialog; the special accesses are switches in Settings (Quick Settings
+ * control is an accessibility service).
  */
 enum class Access(val label: String, val permissions: List<String>) {
     CONTACTS("Contacts", listOf("android.permission.READ_CONTACTS")),
@@ -43,7 +44,8 @@ enum class Access(val label: String, val permissions: List<String>) {
     NEARBY_DEVICES("Nearby devices (Bluetooth)", listOf("android.permission.BLUETOOTH_CONNECT")),
     MICROPHONE("Microphone", listOf("android.permission.RECORD_AUDIO")),
     DO_NOT_DISTURB("Do Not Disturb access", emptyList()),
-    SYSTEM_SETTINGS("Modify system settings", emptyList());
+    SYSTEM_SETTINGS("Modify system settings", emptyList()),
+    QUICK_SETTINGS("Quick Settings control", emptyList());
 
     val isRuntimePermission: Boolean get() = permissions.isNotEmpty()
 }

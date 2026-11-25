@@ -154,17 +154,57 @@ object CommandParser {
     private fun switchCall(tool: String, state: String) = ToolCall(tool, mapOf("state" to state))
 
     /** All the ways to switch a feature: "turn on X", "kill the X", "X off", "toggle X"… */
-    private fun switchRules(tool: String, aliases: String, aloneToggles: Boolean = false): List<Rule> {
+    private fun switchRules(
+        tool: String,
+        aliases: String,
+        aloneToggles: Boolean = false,
+        call: (String) -> ToolCall = { state -> switchCall(tool, state) },
+    ): List<Rule> {
         val a = "$ART(?:$aliases)(?:\\s+mode)?"
         return buildList {
-            add(Rule("(?:$ON_VERBS)\\s+$a") { switchCall(tool, "on") })
-            add(Rule("(?:$OFF_VERBS)\\s+$a") { switchCall(tool, "off") })
-            add(Rule("(?:$SPLIT_VERBS)\\s+$a\\s+(?:back\\s+)?on") { switchCall(tool, "on") })
-            add(Rule("(?:$SPLIT_VERBS)\\s+$a\\s+(?:back\\s+)?(?:off|down)") { switchCall(tool, "off") })
-            add(Rule("$a\\s+(?:back\\s+)?(on|off)") { switchCall(tool, it.groupValues[1].lowercase()) })
-            add(Rule("(?:toggle|flip)\\s+$a") { switchCall(tool, "toggle") })
-            if (aloneToggles) add(Rule(a) { switchCall(tool, "toggle") })
+            add(Rule("(?:$ON_VERBS)\\s+$a") { call("on") })
+            add(Rule("(?:$OFF_VERBS)\\s+$a") { call("off") })
+            add(Rule("(?:$SPLIT_VERBS)\\s+$a\\s+(?:back\\s+)?on") { call("on") })
+            add(Rule("(?:$SPLIT_VERBS)\\s+$a\\s+(?:back\\s+)?(?:off|down)") { call("off") })
+            add(Rule("$a\\s+(?:back\\s+)?(on|off)") { call(it.groupValues[1].lowercase()) })
+            add(Rule("(?:toggle|flip)\\s+$a") { call("toggle") })
+            if (aloneToggles) add(Rule(a) { call("toggle") })
         }
+    }
+
+    private fun tileCall(name: String, state: String) = ToolCall("quick_setting", mapOf("name" to name, "state" to state))
+
+    /**
+     * Quick Settings tiles with no switch of their own, by what people call them. Keys are the
+     * names in [QuickTileNames.known].
+     */
+    private val TILE_ALIASES: Map<String, String> = linkedMapOf(
+        "Battery Saver" to "battery saver|battery saving|power saver|power saving|low power|battery saver mode",
+        "Night Light" to "night light|nightlight|night shift|blue light filter|eye comfort",
+        "Extra dim" to "extra dim|extra dark|extra dimming",
+        "Data Saver" to "data saver|data saving",
+        "Color inversion" to "colou?r inversion|invert(?:ed)? colou?rs",
+        "Color correction" to "colou?r correction|gr[ae]yscale",
+        "Bedtime mode" to "bedtime",
+        "Screen record" to "screen record|screen recording|screen recorder",
+        "Live Caption" to "live captions?",
+        "One-handed mode" to "one[- ]?handed|one hand",
+        "Camera access" to "camera access",
+        "Microphone access" to "mic access|microphone access",
+        "Screen cast" to "screen cast|screencast|casting|screen mirroring|cast",
+        "Work apps" to "work apps|work profile",
+        "Quick Share" to "quick share|nearby share",
+    )
+
+    /** "turn on the X tile", "X in quick settings off", "tap the X tile": any tile by name. */
+    private fun tileRules(): List<Rule> = buildList {
+        val tail = "(?:\\s+(?:tile|quick setting|quick settings tile|toggle)|\\s+(?:in|from|on)\\s+(?:the\\s+)?quick\\s+settings?)"
+        val name = "(?:the\\s+)?(.+?)$tail"
+        add(Rule("(?:$ON_VERBS)\\s+$name") { tileCall(it.groupValues[1], "on") })
+        add(Rule("(?:$OFF_VERBS)\\s+$name") { tileCall(it.groupValues[1], "off") })
+        add(Rule("(?:$SPLIT_VERBS)\\s+$name\\s+(on|off)") { tileCall(it.groupValues[1], it.groupValues[2].lowercase()) })
+        add(Rule("$name\\s+(on|off)") { tileCall(it.groupValues[1], it.groupValues[2].lowercase()) })
+        add(Rule("(?:toggle|flip|tap|press|hit|click)\\s+(?:on\\s+)?$name") { tileCall(it.groupValues[1], "toggle") })
     }
 
     /**
@@ -284,6 +324,11 @@ object CommandParser {
         add(Rule("(?:put|set|switch)\\s+(?:my\\s+|the\\s+)?(?:phone|it)\\s+(?:in|into|on|to)\\s+(?:airplane|aeroplane|flight)\\s+mode") { switchCall("airplane_mode", "on") })
         add(Rule("(?:take|get)\\s+(?:my\\s+|the\\s+)?(?:phone|it)\\s+(?:off|out of)\\s+(?:airplane|aeroplane|flight)\\s+mode") { switchCall("airplane_mode", "off") })
         add(Rule("(?:i need|give me|i could use)\\s+(?:some\\s+|a\\s+)?light|(?:i\\s+)?can't see(?:\\s+anything)?\\s+in\\s+the\\s+dark") { switchCall("flashlight", "on") })
+        // Quick Settings tiles: any tile named as a tile, then the ones known by name.
+        addAll(tileRules())
+        for ((tile, aliases) in TILE_ALIASES) addAll(switchRules("quick_setting", aliases) { state -> tileCall(tile, state) })
+        add(Rule("(?:start|stop)\\s+(?:recording|recording\\s+(?:the|my)\\s+screen)|record\\s+(?:the|my)\\s+screen") { tileCall("Screen record", "toggle") })
+        add(Rule("cast\\s+(?:my|the)\\s+(?:screen|phone)") { tileCall("Screen cast", "on") })
         add(Rule("(?:don't|do not)\\s+disturb\\s+me|(?:no|hold)\\s+(?:all\\s+)?(?:notifications|interruptions)") { switchCall("do_not_disturb", "on") })
 
         // Ringer. "mute it" is left to the media volume rules below.

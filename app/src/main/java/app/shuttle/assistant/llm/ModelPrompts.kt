@@ -50,7 +50,7 @@ object ModelPrompts {
             ),
         )
         val keep = listOf(
-            "ringer_mode", "brightness", "volume", "media", "call", "set_alarm", "set_timer",
+            "ringer_mode", "brightness", "volume", "media", "quick_setting", "call", "set_alarm", "set_timer",
             "open_app", "navigate", "battery_status", "date_time",
         )
         keep.forEach { name -> add(ToolSchemas.find(name)!!) }

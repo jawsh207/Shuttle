@@ -285,6 +285,24 @@ class CommandParserTest {
         check("search my chats", null)
     }
 
+    @Test fun quickSettingTiles() {
+        fun tile(name: String, state: String) = call("quick_setting", "name" to name, "state" to state)
+        check("turn on battery saver", tile("Battery Saver", "on"))
+        check("power saving mode off", tile("Battery Saver", "off"))
+        check("enable night light", tile("Night Light", "on"))
+        check("toggle extra dim", tile("Extra dim", "toggle"))
+        check("turn off data saver", tile("Data Saver", "off"))
+        check("start screen recording", tile("Screen record", "on"))
+        check("cast my screen", tile("Screen cast", "on"))
+        check("turn on the caffeine tile", tile("caffeine", "on"))
+        check("tap the sync tile", tile("sync", "toggle"))
+        check("turn off private dns in quick settings", tile("private dns", "off"))
+        // Switches and other commands keep their own tools.
+        check("turn off mobile data", call("mobile_data", "state" to "off"))
+        check("turn on the light", call("flashlight", "state" to "on"))
+        check("turn on dark mode", call("dark_mode", "state" to "on"))
+    }
+
     @Test fun severalCommandsAtOnce() {
         assertEquals(
             listOf(call("wifi", "state" to "off"), call("bluetooth", "state" to "off")),

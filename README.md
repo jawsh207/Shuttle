@@ -39,6 +39,7 @@ nothing is sent anywhere.
 | Flashlight | "flashlight on", "toggle the torch" |
 | Radios | "turn off Wi-Fi", "Bluetooth on", "mobile data off", "NFC on" |
 | Other switches | "airplane mode on", "location off", "hotspot on", "dark mode on" |
+| Quick Settings tiles | "battery saver on", "turn on night light", "extra dim off", "data saver on", "start screen recording", "turn on the Caffeine tile", "tap the sync tile" |
 | Do Not Disturb and ringer | "turn on do not disturb", "silence my phone", "vibrate mode" |
 | Screen | "brightness 40%", "dim the screen", "auto-rotate off", "adaptive brightness on" |
 | Media | "play", "pause the music", "next track", "volume up", "set volume to 30" |
@@ -138,6 +139,31 @@ Shuttle uses only what a normal app may do, so some switches need one tap from y
 - **Asks to confirm:** Bluetooth on (the system "allow Shuttle to turn on Bluetooth?" prompt).
 - **Opens the settings page:** Bluetooth off, airplane mode, location, hotspot, dark theme.
 
+### Quick Settings control (optional)
+
+Turn on **Quick Settings control** (Settings › Special access, which opens Android's
+Accessibility page) and Shuttle switches these itself, the way you would: it opens Quick
+Settings, taps the tile (paging through if it's not on the first page), checks that it changed
+and closes the shade again. That covers Wi-Fi, mobile data, NFC, Bluetooth, airplane mode,
+location, hotspot and dark theme, plus any other tile by name: battery saver, night light,
+extra dim, data saver, screen record, cast, or a tile from another app ("turn on the Caffeine
+tile").
+
+- **Dialogs:** where a tile opens a dialog instead (Internet on Android 12+, Bluetooth on
+  newer versions), Shuttle uses the switch inside and closes it. Tiles that only open something
+  (screen record, cast) are tapped and left open for you.
+- **What it can see:** it's an accessibility service, so Android warns that it could read the
+  screen. It listens only to the system UI's events, reads the shade only while doing what
+  you asked, and keeps nothing.
+- **Restricted setting:** if Android says the setting is restricted (apps installed from a
+  file on Android 13+), open Shuttle's App info, tap ⋮, choose **Allow restricted settings**,
+  then turn it on.
+- **Languages:** the built-in tile names are English. In another language, name the tile as
+  your phone shows it ("turn on the … tile"); otherwise the switches fall back to their panel
+  or settings page.
+- **A tile that isn't there** (not added to Quick Settings) can't be tapped; Shuttle lists the
+  tiles it found.
+
 ## Permissions
 
 Nothing is asked for up front. Each command asks for what it needs the first time, and
@@ -155,6 +181,7 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
 | Modify system settings (special) | Brightness and auto-rotate |
+| Quick Settings control (optional accessibility service) | Tapping Quick Settings tiles for switches apps can't change |
 | Set alarms | Creating alarms and timers in your clock app |
 
 ## Set as your assistant

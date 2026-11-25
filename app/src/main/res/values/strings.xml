@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Shuttle</string>
+    <string name="quick_tiles_label">Shuttle Quick Settings control</string>
+    <string name="quick_tiles_description">Lets Shuttle switch Quick Settings tiles for you: when you ask it to turn something on or off, it opens Quick Settings, taps that tile and closes it again. It only looks at the system\'s own screens (the status bar and Quick Settings), only while doing what you asked, and nothing it sees is saved or sent anywhere.</string>
 </resources>
