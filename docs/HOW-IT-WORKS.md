@@ -299,4 +299,5 @@ timers are created in your own clock app, which rings them.
 | `engine/Json.kt` | A small JSON reader (testable without Android) |
 | `engine/SettingsPages.kt` | Settings pages by name |
 | `engine/QuickTileNames.kt` | Tile labels for each switch, name matching, reading on/off |
+| `tools/icon/make_icon.py` | Draws the launcher icon (foreground and one-colour version) and an SVG preview; run it from the repo root after changing a shape |
 | `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |
