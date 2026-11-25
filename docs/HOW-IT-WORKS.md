@@ -189,8 +189,11 @@ Settings, finds the tile by its label (`engine/QuickTileNames.kt` matches names 
 "On"/"Off"), pages through if needed, taps it only if that changes anything, checks the
 result and closes the shade. Real tiles (which say whether they're on) are preferred over
 status bar icons with the same name, such as the Wi-Fi and Bluetooth icons at the top of the
-shade. A tap that Android refuses is retried on the tile's parent, then as a real touch on
-the screen. To reach later pages it pages the element holding the most tiles (not the
+shade. Newer Android splits a large tile in two: the icon switches it and the rest opens its details.
+So Shuttle taps the tile's own switch element if it has one, then touches the icon (the start
+of a wide tile), then the tile as a whole. It checks after each try whether the tile changed,
+and goes back if a tap opened the details instead. It never taps again once the tile has
+changed. To reach later pages it pages the element holding the most tiles (not the
 notification list), and if the tiles shown don't change, swipes across them instead. When a
 switch's tile isn't found, its fallback panel says so and lists the tiles that were found. Mobile data never uses a Wi-Fi tile or switch. It looks on every page for a
 tile called Mobile data (or one named after the carrier that mentions LTE, 5G and so on).

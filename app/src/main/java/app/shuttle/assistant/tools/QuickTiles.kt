@@ -12,11 +12,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.TextUtils
+import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
 import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.engine.QuickTileNames
 import app.shuttle.assistant.engine.ToolCall
 import app.shuttle.assistant.engine.ToolResult
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -210,51 +213,109 @@ object QuickTiles {
         val switchesBefore = switches(svc).map { key(it.second) }.toSet()
         val textsBefore = texts(svc).toSet()
         val target = want ?: before?.let { !it }
-        // Tap the best match; if Android refuses, the next one that looks like the same tile.
-        if (matches.filter { it.tileness >= tile.tileness - 10 }.take(3).none { tap(svc, it.node) }) {
-            close(svc)
-            return Outcome.Failed("Android didn't let me tap $name.")
-        }
+        fun current(): Tile? = tiles(svc)
+            .filter { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
+            .maxByOrNull { it.tileness }
 
-        // Did it switch, or open a dialog?
-        val deadline = System.currentTimeMillis() + 2500
-        while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(150)
-            val now = tiles(svc)
-                .filter { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
-                .maxByOrNull { it.tileness }
-            val after = now?.state
-            if (before != null && after != null && after != before) {
-                if (usingLastResort) {
-                    // This Internet tile switched by itself, so it's Wi-Fi, not the combined
-                    // tile with mobile data inside: put it back.
-                    now?.let { tap(svc, it.node) }
-                    Thread.sleep(300)
-                    close(svc)
-                    return Outcome.NotFound(seen.filter { it.isNotBlank() })
-                }
-                close(svc)
-                return Outcome.Done("$name ${word(after)}.")
-            }
-            // "Turn off mobile data?": Android's own confirmation. Answer it as asked.
-            if (target != null) confirmButton(svc, textsBefore, target)?.let { button ->
-                tap(svc, button)
-                Thread.sleep(600)
-                val state = tiles(svc)
-                    .filter { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
-                    .maxByOrNull { it.tileness }?.state
-                close(svc)
-                return Outcome.Done("$name ${word(state ?: target)}.")
-            }
-            val dialog = switches(svc).filter { key(it.second) !in switchesBefore }
-            if (dialog.isNotEmpty()) return useDialog(svc, call, names, dialog, want, name, textsBefore)
-        }
+        // A tile that only opens something (screen record, cast): tap it and leave it to the user.
         if (before == null) {
-            // A tile that opens something (screen record, cast): leave it for the user.
+            if (matches.filter { it.tileness >= tile.tileness - 10 }.take(3).none { tap(svc, it.node) }) {
+                close(svc)
+                return Outcome.Failed("Android didn't let me tap $name.")
+            }
             return Outcome.Done("Tapped $name.")
         }
+
+        // On newer Android a large tile has two parts: its icon switches it, the rest opens its
+        // details. So try the icon first, then the tile as a whole, checking after each tap.
+        for (attempt in 0 until 3) {
+            // A slow tile may have switched after all; never tap it a second time if so.
+            current()?.state?.let { if (it != before) { close(svc); return Outcome.Done("$name ${word(it)}.") } }
+            val node = current()?.node ?: tile.node
+            val tapped = when (attempt) {
+                0 -> tapToggle(svc, node)
+                1 -> tapIcon(svc, node)
+                else -> tap(svc, node)
+            }
+            if (!tapped) continue
+
+            // Did it switch, ask to confirm, or open a dialog?
+            val deadline = System.currentTimeMillis() + 2000
+            while (System.currentTimeMillis() < deadline) {
+                Thread.sleep(150)
+                val now = current()
+                val after = now?.state
+                if (after != null && after != before) {
+                    if (usingLastResort) {
+                        // This Internet tile switched by itself, so it's Wi-Fi, not the combined
+                        // tile with mobile data inside: put it back.
+                        now?.let { tapToggle(svc, it.node) || tapIcon(svc, it.node) }
+                        Thread.sleep(300)
+                        close(svc)
+                        return Outcome.NotFound(seen.filter { it.isNotBlank() })
+                    }
+                    close(svc)
+                    return Outcome.Done("$name ${word(after)}.")
+                }
+                // "Turn off mobile data?": Android's own confirmation. Answer it as asked.
+                if (target != null) confirmButton(svc, textsBefore, target)?.let { button ->
+                    tap(svc, button)
+                    Thread.sleep(600)
+                    val state = current()?.state
+                    close(svc)
+                    return Outcome.Done("$name ${word(state ?: target)}.")
+                }
+                val dialog = switches(svc).filter { key(it.second) !in switchesBefore }
+                if (dialog.isNotEmpty()) return useDialog(svc, call, names, dialog, want, name, textsBefore)
+            }
+            // Nothing changed. If the tap opened the tile's details in place of the tiles, go back.
+            if (current() == null) {
+                svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                Thread.sleep(400)
+                if (current() == null) break
+            }
+        }
         close(svc)
-        return Outcome.Done("Tapped $name. It may take a moment to change.")
+        return Outcome.Failed("I tapped $name but it didn't change. Try tapping its tile yourself once; if that works, tell me so I can learn how this tile is laid out.")
+    }
+
+    /**
+     * Taps the part of a tile that switches it, when the tile reports one as its own element
+     * (a switch or button inside it). False when there isn't one.
+     */
+    private fun tapToggle(svc: AccessibilityService, tile: AccessibilityNodeInfo): Boolean {
+        val inner = ArrayList<AccessibilityNodeInfo>()
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 4) return
+            for (i in 0 until n.childCount) n.getChild(i)?.let { c ->
+                if (c.isVisibleToUser && (c.isClickable || c.isCheckable)) inner += c
+                walk(c, depth + 1)
+            }
+        }
+        walk(tile, 0)
+        // A switch first, then the smallest tappable part (the icon, not a chevron-plus-label).
+        val toggle = inner.firstOrNull { it.isCheckable }
+            ?: inner.minByOrNull { n -> Rect().also(n::getBoundsInScreen).let { it.width() * it.height() } }
+            ?: return false
+        return tap(svc, toggle)
+    }
+
+    /**
+     * Touches a tile's icon: at the start of a wide tile (where the icon sits), or the middle
+     * of a small square one. Used when the icon isn't its own element.
+     */
+    private fun tapIcon(svc: AccessibilityService, tile: AccessibilityNodeInfo): Boolean {
+        val r = Rect().also(tile::getBoundsInScreen)
+        if (r.isEmpty) return false
+        val wide = r.width() > r.height() * 1.4f
+        val rtl = TextUtils.getLayoutDirectionFromLocale(Locale.getDefault()) == View.LAYOUT_DIRECTION_RTL
+        val x = when {
+            !wide -> r.exactCenterX()
+            rtl -> r.right - r.height() / 2f
+            else -> r.left + r.height() / 2f
+        }
+        val path = Path().apply { moveTo(x, r.exactCenterY()) }
+        return gesture(svc, GestureDescription.StrokeDescription(path, 0, 60))
     }
 
     /** A tile opened a dialog with switches (Internet, Bluetooth): use the right one. */
