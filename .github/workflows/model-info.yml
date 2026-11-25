@@ -6,23 +6,22 @@ jobs:
   info:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch model metadata
+      - name: DuckDuckGo HTML sample
         run: |
-          B=https://huggingface.co/ibm-granite
-          echo "=== HEAD Q4_K_M"
-          curl -sIL "$B/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_0.gguf" | grep -i -E "x-linked-etag|x-linked-size|content-length|location|etag" || true
-          echo "=== chat_template.jinja"
-          curl -sfL "$B/granite-4.2-3b/resolve/main/chat_template.jinja" || echo "(none)"
-          echo "=== tokenizer_config.json chat_template"
-          curl -sfL "$B/granite-4.2-3b/resolve/main/tokenizer_config.json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('chat_template','(none)')); print('eos', d.get('eos_token'), 'bos', d.get('bos_token'))" || true
-          echo "=== generation_config.json"
-          curl -sfL "$B/granite-4.2-3b/resolve/main/generation_config.json" || true
-          echo "=== GGUF README"
-          curl -sfL "$B/granite-4.2-3b-GGUF/resolve/main/README.md" || true
-      - name: Download and hash Q4_K_M
+          UA="Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36"
+          curl -s -A "$UA" -o ddg.html -w "status %{http_code} size %{size_download}\n" "https://html.duckduckgo.com/html/?q=who+is+the+current+president+of+france"
+          echo "=== result blocks: $(grep -c 'class="result__a"' ddg.html)"
+          python3 - <<'PY'
+          s=open('ddg.html',encoding='utf-8',errors='replace').read()
+          i=s.find('class="result__a"')
+          print(s[max(0,i-1500):i+2500] if i>=0 else s[:3000])
+          PY
+          echo "=== POST"
+          curl -s -A "$UA" -o ddg2.html -w "status %{http_code} size %{size_download}\n" -d "q=pizza+dough+recipe" "https://html.duckduckgo.com/html/"
+          echo "result blocks: $(grep -c 'class="result__a"' ddg2.html)"
+          echo "=== lite"
+          curl -s -A "$UA" -o lite.html -w "status %{http_code} size %{size_download}\n" "https://lite.duckduckgo.com/lite/?q=pizza+dough+recipe"
+          echo "lite result-link: $(grep -c 'result-link' lite.html)"
+      - name: Wikipedia sample
         run: |
-          curl -sfL -o m.gguf "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_0.gguf"
-          ls -l m.gguf
-          sha256sum m.gguf
-      - name: Latest llama.cpp release
-        run: curl -s https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['tag_name'], d['published_at'])"
+          curl -s -A "Shuttle/0.1 (https://github.com/jawsh207/Shuttle)" "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrsearch=current+president+of+france&gsrlimit=3&prop=extracts|info&inprop=url&exintro=1&explaintext=1&exsentences=3&exlimit=3" | head -c 2500
