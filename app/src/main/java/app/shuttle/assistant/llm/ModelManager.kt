@@ -23,7 +23,8 @@ import java.util.concurrent.Executors
  * Nothing downloads until the user taps Download. The finished file's SHA-256 must match
  * [ModelSpec.sha256] or it's deleted. The model lives in the app's own external files folder,
  * which only Shuttle can read and which is removed with the app. [state] is Compose state, so
- * Settings and the chat follow along.
+ * Settings and the chat follow along. While an update downloads, [installed] keeps the current
+ * model answering; it's swapped only once the new file has passed its checksum.
  */
 object ModelManager {
 
@@ -55,7 +56,12 @@ object ModelManager {
     var wifiOnly: Boolean by mutableStateOf(true)
         private set
 
-    val ready: State.Ready? get() = state as? State.Ready
+    /** The model on the phone, if any. Stays usable while an update downloads. */
+    var installed: State.Ready? by mutableStateOf(null)
+        private set
+
+    /** The model to answer with: the installed one, even mid-update. */
+    val ready: State.Ready? get() = (state as? State.Ready) ?: installed
 
     internal val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "shuttle-model-files") }
@@ -85,6 +91,7 @@ object ModelManager {
             p.edit().remove("download_id").apply()
         }
         state = installedState(c)
+        installed = state as? State.Ready
         val pending = ModelSpec.parse(p.getString("download_spec", "") ?: "")
         if (pending != null) {
             // The download was interrupted (phone restarted, app updated); carry on.
@@ -129,6 +136,7 @@ object ModelManager {
         io.execute { dir(c).listFiles { f -> f.name.endsWith(".gguf") }?.forEach { it.delete() } }
         prefs(c).edit().remove("installed_id").remove("installed_spec").apply()
         update = null
+        installed = null
         if (state is State.Ready) state = State.Missing
     }
 
@@ -146,6 +154,7 @@ object ModelManager {
             return State.Failed("The download was damaged, so it was deleted. Try again.")
         }
         LocalModel.unloadNow()
+        main.post { installed = null }
         folder.listFiles { f -> f.name.endsWith(".gguf") }?.forEach { it.delete() }
         val target = File(folder, spec.fileName)
         if (!partial.renameTo(target)) return State.Failed("The model couldn't be saved. Check free storage and try again.")
@@ -154,10 +163,14 @@ object ModelManager {
             .putString("installed_spec", ModelSpec.encode(spec))
             .remove("download_spec")
             .apply()
-        main.post { update = null }
+        val done = State.Ready(spec, target)
+        main.post {
+            update = null
+            installed = done
+        }
         // Get it ready for the first question.
         LocalModel.prepare(target)
-        return State.Ready(spec, target)
+        return done
     }
 
     internal fun installedState(c: Context): State {

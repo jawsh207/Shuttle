@@ -7,6 +7,8 @@
     "url": "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_0.gguf",
     "sha256": "d34a4a7c0b230d3f544eca502beb7e04efc3a0ebd59e2f2df50058f23cc20711",
     "size": 2129118752,
-    "license": "Apache-2.0"
+    "license": "Apache-2.0",
+    "build": "Q4_0",
+    "note": "A faster build of the same model: answers start sooner on phone processors."
   }
 }

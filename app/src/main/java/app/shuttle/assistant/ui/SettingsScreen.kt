@@ -312,7 +312,7 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
         }
     }
     val summary = when (state) {
-        is ModelManager.State.Ready -> if (update != null) "Update available" else "${state.spec.name} is ready"
+        is ModelManager.State.Ready -> if (update != null) "Update available" else "${state.spec.label} is ready"
         is ModelManager.State.Downloading -> "Downloading, ${state.percent}%"
         is ModelManager.State.WaitingForWifi -> "Waiting for Wi-Fi"
         is ModelManager.State.WaitingForNetwork -> "Waiting for a connection"
@@ -328,7 +328,7 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val shown = (state as? ModelManager.State.Ready)?.spec ?: spec
-                Text(shown.name, style = MaterialTheme.typography.titleMedium)
+                Text(shown.label, style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Runs on this phone for chat and questions; phone commands never need it. " +
                         "${shown.sizeLabel}, downloaded once. ${shown.license} license.",
@@ -339,7 +339,11 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
                 when (state) {
                     is ModelManager.State.Downloading -> {
                         LinearWavyProgressIndicator(progress = { state.percent / 100f }, modifier = Modifier.fillMaxWidth())
-                        Text("${state.percent}% · continues with Shuttle closed", style = small)
+                        Text(
+                            "${state.percent}% · continues with Shuttle closed" +
+                                (if (ModelManager.installed != null) ". The current model keeps working meanwhile." else ""),
+                            style = small,
+                        )
                         OutlinedButton(onClick = { ModelManager.cancel(context) }) { Text("Cancel") }
                     }
                     is ModelManager.State.WaitingForWifi -> {
@@ -356,11 +360,24 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
                         LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                         Text("Checking the download…", style = small)
                     }
-                    is ModelManager.State.Ready -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    is ModelManager.State.Ready -> {
+                        Text("Installed and ready.", style = small)
                         if (update != null) {
-                            Button(onClick = { download(update) }) { Text("Update (${update.sizeLabel})") }
+                            // Spell out what the update is: two builds of one model share a name.
+                            Text(
+                                "Update available: ${update.label}, ${update.sizeLabel}. " +
+                                    (update.note.ifEmpty { "A newer choice of model." }) +
+                                    " The current model keeps working until the new one is downloaded and checked.",
+                                style = small,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
-                        OutlinedButton(onClick = onDelete) { Text("Delete") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (update != null) {
+                                Button(onClick = { download(update) }) { Text("Update") }
+                            }
+                            OutlinedButton(onClick = onDelete) { Text("Delete") }
+                        }
                     }
                     is ModelManager.State.Failed -> {
                         Text(state.message, style = small, color = MaterialTheme.colorScheme.error)

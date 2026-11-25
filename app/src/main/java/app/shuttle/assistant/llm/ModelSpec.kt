@@ -26,7 +26,14 @@ data class ModelSpec(
     val sha256: String,
     val size: Long,
     val license: String,
+    /** Which build of the model, e.g. "Q4_0"; tells two builds of the same model apart. */
+    val build: String = "",
+    /** One line on why this one is offered, shown with an update. */
+    val note: String = "",
 ) {
+    /** "Granite 4.2 3B (Q4_0)" */
+    val label: String get() = if (build.isEmpty()) name else "$name ($build)"
+
     val fileName: String get() = "$id.gguf"
 
     /** "2.1 GB" */
@@ -43,6 +50,8 @@ data class ModelSpec(
             sha256 = "d34a4a7c0b230d3f544eca502beb7e04efc3a0ebd59e2f2df50058f23cc20711",
             size = 2_129_118_752,
             license = "Apache-2.0",
+            build = "Q4_0",
+            note = "A faster build of the same model: answers start sooner on phone processors.",
         )
 
         /** Reads the manifest from GitHub; null when offline or unreadable. Call off the main thread. */
@@ -62,7 +71,8 @@ data class ModelSpec(
             "model",
             JSONObject()
                 .put("id", spec.id).put("name", spec.name).put("format", spec.format).put("url", spec.url)
-                .put("sha256", spec.sha256).put("size", spec.size).put("license", spec.license),
+                .put("sha256", spec.sha256).put("size", spec.size).put("license", spec.license)
+                .put("build", spec.build).put("note", spec.note),
         ).toString()
 
         fun parse(json: String): ModelSpec? = runCatching {
@@ -75,6 +85,8 @@ data class ModelSpec(
                 sha256 = m.getString("sha256").lowercase(),
                 size = m.getLong("size"),
                 license = m.getString("license"),
+                build = m.optString("build", ""),
+                note = m.optString("note", ""),
             ).takeIf { it.format == "granite" && it.url.startsWith("https://") && it.sha256.length == 64 }
         }.getOrNull()
     }
