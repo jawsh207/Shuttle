@@ -56,5 +56,7 @@ class QuickTileNamesTest {
     @Test
     fun displayName() {
         assertEquals("Battery Saver", QuickTileNames.display("Battery Saver\nOff"))
+        assertEquals("Bluetooth", QuickTileNames.display("Bluetooth."))
+        assertEquals("Bluetooth", QuickTileNames.display("Bluetooth., On"))
     }
 }

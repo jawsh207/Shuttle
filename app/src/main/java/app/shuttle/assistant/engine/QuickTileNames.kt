@@ -148,6 +148,9 @@ object QuickTileNames {
         }
     }
 
-    /** The label to show: the tile's first line, without its state ("Battery Saver"). */
-    fun display(label: String): String = label.split(',', '\n').first().trim()
+    /**
+     * The label to show: the tile's first line, without its state or the full stop some
+     * versions end it with ("Bluetooth." reads as "Bluetooth").
+     */
+    fun display(label: String): String = label.split(',', '\n').first().trim().trimEnd('.', ';', ':').trim()
 }
