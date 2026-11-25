@@ -239,9 +239,10 @@ Each build has a higher version code, so it installs as an update over the last 
 Until the release signing secrets are set (see [Signing](#signing)), each run instead publishes
 **Shuttle-debug-…**: the same optimized build (the `preview` build type, so it opens at full
 speed), signed with a throwaway test key that's kept in the repository (`app/debug.keystore`).
-It installs next to release builds as *Shuttle Debug*, and each one updates the last (including
-older, debuggable test builds), keeping the model and chats. It's for testing only: the key is
-public, and releases never use it.
+It installs as **app.shuttle.assistant**, the app's real package name, and each one updates
+the last. It's for testing only: the key is public, and releases never use it. Because the
+package name is the same, a release-key build can't install over it; uninstall the test build
+first (the model and chats go with it).
 
 The repository includes llama.cpp as a git submodule, so clone with
 `git clone --recursive` (or run `git submodule update --init` after cloning).

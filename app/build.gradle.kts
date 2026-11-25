@@ -79,17 +79,16 @@ android {
         }
         // The test build CI publishes when there's no release key: the release build (R8,
         // not debuggable, so it opens and scrolls at real speed; a debuggable Compose app is
-        // several times slower) signed with the throwaway test key, installing as "Shuttle
-        // Debug" over the debug build without losing its model or chats.
+        // several times slower) signed with the throwaway test key. It has the app's real
+        // package name, app.shuttle.assistant, so a build signed with the release key later
+        // can't update it: that needs an uninstall first.
         create("preview") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            versionNameSuffix = "-test"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
         }
     }
-    sourceSets.getByName("preview").res.srcDirs("src/debug/res")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
