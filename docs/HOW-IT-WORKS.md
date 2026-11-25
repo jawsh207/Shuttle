@@ -134,7 +134,7 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   recipes, advice), starting with the answer and matching its length to the question, light
   Markdown for lists and key terms, using the phone's tools only when asked to do something on
   the phone, searching the web for anything current, and never naming a knowledge cutoff year
-  (it can't know it). Earlier turns of the chat go along as context: a window of up to roughly
+  (it can't know it). It's told to treat the user as an adult and answer sensitive subjects (health, drugs, law, security, mature themes) frankly and specifically, without lecturing, and to decline only requests that would seriously help someone hurt people. Earlier turns of the chat go along as context: a window of up to roughly
   3,000 tokens whose start stays put; when it outgrows that, the oldest turns are dropped until
   it's down to half. Dropping one turn per question would change the start of every prompt and
   make the model re-read the whole chat each time. The model
