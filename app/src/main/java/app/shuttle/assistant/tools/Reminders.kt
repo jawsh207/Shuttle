@@ -107,7 +107,7 @@ internal object Reminders {
             PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = Notification.Builder(context, CHANNEL)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(text)
             .setContentText("Reminder")
             .setCategory(Notification.CATEGORY_REMINDER)

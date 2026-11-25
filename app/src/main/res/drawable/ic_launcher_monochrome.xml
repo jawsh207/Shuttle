@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One-colour version of the icon (shuttle and wave, no glow) for themed launcher icons and
+  notifications; the system tints it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-45">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3"
+            android:strokeLineJoin="round"
+            android:pathData="M31,54 L26,50.2 C38,45.6 70,45.6 82,50.2 L77,54 L82,57.8 C70,62.4 38,62.4 26,57.8 Z" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.4"
+            android:pathData="M37,54 a17,3.8 0 1,0 34,0 a17,3.8 0 1,0 -34,0" />
+    </group>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M18,60 C24,60 26,38 34,38 C46,38 62,70 74,70 C82,70 86,54 90,54" />
+</vector>
