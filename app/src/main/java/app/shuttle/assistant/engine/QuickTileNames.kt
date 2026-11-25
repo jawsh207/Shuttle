@@ -18,7 +18,7 @@ object QuickTileNames {
     val forSwitch: Map<String, List<String>> = mapOf(
         "wifi" to listOf("Wi-Fi", "Wifi", "Internet"),
         "bluetooth" to listOf("Bluetooth"),
-        "mobile_data" to listOf("Mobile data", "Cellular data", "Mobile network", "Cellular", "Internet"),
+        "mobile_data" to listOf("Mobile data", "Cellular data", "Mobile network", "Cellular"),
         "nfc" to listOf("NFC"),
         "airplane_mode" to listOf("Airplane mode", "Flight mode", "Aeroplane mode"),
         "location" to listOf("Location"),
@@ -60,6 +60,31 @@ object QuickTileNames {
             .flatten()
         return (listOf(name) + extra).distinctBy(::normalize)
     }
+
+    /**
+     * Names tried only when no tile matches the ones above on any page: the combined Internet
+     * tile, which opens a dialog holding the mobile data switch. On phones with separate tiles
+     * the Wi-Fi tile can be the one called Internet, so it's only used if it opens that dialog.
+     */
+    val lastResort: Map<String, List<String>> = mapOf("mobile_data" to listOf("Internet"))
+
+    private val networkWords = setOf(
+        "lte", "5g", "4g", "3g", "2g", "5ge", "4g+", "h+", "edge", "gprs", "umts", "hspa", "volte",
+        "sim", "roaming", "mobile", "cellular", "carrier", "nr",
+    )
+
+    /**
+     * Whether a tile looks like the mobile data tile even though it's named after the carrier
+     * ("Mint, LTE"): it mentions a network type or mobile data, and isn't the Wi-Fi tile.
+     */
+    fun looksLikeMobileData(label: String): Boolean {
+        if (isWifi(label)) return false
+        val words = label.lowercase().split(Regex("[^\\p{L}\\p{N}+]+")).filter { it.isNotEmpty() }
+        return words.any { it in networkWords }
+    }
+
+    /** Whether a label is Wi-Fi's (so mobile data must never use it). */
+    fun isWifi(label: String): Boolean = listOf("Wi-Fi", "Wifi", "WLAN").any { score(label, it) >= 2 }
 
     /**
      * When a tile opens a dialog instead of switching (Internet, and Bluetooth on newer

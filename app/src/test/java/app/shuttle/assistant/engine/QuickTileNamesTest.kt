@@ -36,6 +36,16 @@ class QuickTileNamesTest {
     }
 
     @Test
+    fun mobileDataTileNamedAfterTheCarrier() {
+        assertEquals(true, QuickTileNames.looksLikeMobileData("Mint, LTE, On"))
+        assertEquals(true, QuickTileNames.looksLikeMobileData("T-Mobile\n5G"))
+        assertEquals(false, QuickTileNames.looksLikeMobileData("Wi-Fi, On, Home 5G"))
+        assertEquals(false, QuickTileNames.looksLikeMobileData("Battery Saver"))
+        // "Internet" is no longer one of mobile data's own names.
+        assertNull(QuickTileNames.best(listOf("Internet, On"), QuickTileNames.forSwitch.getValue("mobile_data")))
+    }
+
+    @Test
     fun readsState() {
         assertEquals(true, QuickTileNames.stateFrom("Wi-Fi, On, Home"))
         assertEquals(false, QuickTileNames.stateFrom("Off"))

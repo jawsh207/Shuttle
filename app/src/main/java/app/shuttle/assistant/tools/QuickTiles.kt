@@ -165,14 +165,33 @@ object QuickTiles {
 
         // Find the tile, paging through Quick Settings if it isn't on the first page.
         val seen = LinkedHashSet<String>()
-        var matches: List<Tile> = emptyList()
-        for (page in 0 until 6) {
-            matches = waitFor(if (page == 0) 1500 else 700) {
-                val tiles = tiles(svc)
-                tiles.forEach { if (it.tileness > 0) seen += QuickTileNames.display(it.label) }
-                QuickTileNames.ranked(tiles.map { it.label }, names) { tiles[it].tileness }.map { tiles[it] }.ifEmpty { null }
-            }.orEmpty()
-            if (matches.isNotEmpty() || !nextPage(svc)) break
+        val mobile = call.name == "mobile_data"
+        fun search(names: List<String>): List<Tile> {
+            for (page in 0 until 6) {
+                val found = waitFor(if (page == 0) 1500 else 700) {
+                    val tiles = tiles(svc).filter { !mobile || !QuickTileNames.isWifi(it.label) }
+                    tiles.forEach { if (it.tileness > 0) seen += QuickTileNames.display(it.label) }
+                    val named = QuickTileNames.ranked(tiles.map { it.label }, names) { tiles[it].tileness }.map { tiles[it] }
+                    // A mobile data tile named after the carrier ("Mint, LTE").
+                    val carrier = if (mobile && names !== QuickTileNames.lastResort[call.name]) {
+                        tiles.filter { it.tileness > 0 && QuickTileNames.looksLikeMobileData(it.label) }
+                    } else emptyList()
+                    (named + carrier).distinct().ifEmpty { null }
+                }
+                if (found != null) return found
+                if (!nextPage(svc)) break
+            }
+            return emptyList()
+        }
+        var matches = search(names)
+        // Only when nothing matched on any page: the last-resort names, from the first page again.
+        val lastResort = QuickTileNames.lastResort[call.name]
+        val usingLastResort = matches.isEmpty() && lastResort != null
+        if (usingLastResort) {
+            close(svc)
+            Thread.sleep(400)
+            svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
+            matches = search(lastResort!!)
         }
         val tile = matches.firstOrNull()
         if (tile == null) {
@@ -202,6 +221,14 @@ object QuickTiles {
                 .maxByOrNull { it.tileness }
             val after = now?.state
             if (before != null && after != null && after != before) {
+                if (usingLastResort) {
+                    // This Internet tile switched by itself, so it's Wi-Fi, not the combined
+                    // tile with mobile data inside: put it back.
+                    now?.let { tap(svc, it.node) }
+                    Thread.sleep(300)
+                    close(svc)
+                    return Outcome.NotFound(seen.filter { it.isNotBlank() })
+                }
                 close(svc)
                 return Outcome.Done("$name ${word(after)}.")
             }
@@ -228,9 +255,8 @@ object QuickTiles {
         val labels = dialog.map { it.second }
         val wanted = QuickTileNames.dialogSwitch[call.name] ?: names
         val index = QuickTileNames.best(labels, wanted)
-            ?: dialog.indices.singleOrNull()
             // Internet's dialog has Wi-Fi and the carrier's mobile data; mobile data is the other one.
-            ?: if (call.name == "mobile_data") labels.indices.filter { QuickTileNames.best(listOf(labels[it]), QuickTileNames.dialogSwitch.getValue("wifi")) == null }.singleOrNull() else null
+            ?: (if (call.name == "mobile_data") labels.indices.filter { !QuickTileNames.isWifi(labels[it]) } else dialog.indices.toList()).singleOrNull()
         if (index == null) return Outcome.Done("$tileName opened its settings; switch it there.")
         val (node, label) = dialog[index]
         val isOn = node.isChecked

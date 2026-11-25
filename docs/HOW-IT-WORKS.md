@@ -192,7 +192,10 @@ status bar icons with the same name, such as the Wi-Fi and Bluetooth icons at th
 shade. A tap that Android refuses is retried on the tile's parent, then as a real touch on
 the screen. To reach later pages it pages the element holding the most tiles (not the
 notification list), and if the tiles shown don't change, swipes across them instead. When a
-switch's tile isn't found, its fallback panel says so and lists the tiles that were found. A tile that opens a dialog (Internet, Bluetooth) has the right
+switch's tile isn't found, its fallback panel says so and lists the tiles that were found. Mobile data never uses a Wi-Fi tile or switch. It looks on every page for a
+tile called Mobile data (or one named after the carrier that mentions LTE, 5G and so on).
+Only then does it try the combined Internet tile, and only through its dialog: an Internet
+tile that switches by itself is Wi-Fi's, so the tap is undone. A tile that opens a dialog (Internet, Bluetooth) has the right
 switch in the dialog used instead. This watches the screen for a second or two, so it runs on
 its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
 several commands in one sentence wait for each other. If no tile matches, a switch falls back
