@@ -1,18 +1,14 @@
 package app.shuttle.assistant.ui
 
 import android.text.format.DateUtils
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.llm.ModelManager
@@ -283,7 +279,7 @@ private fun ChatList(
         } else {
             item(key = "header") {
                 Text(
-                    if (searching) "Matching chats" else "Recent chats · touch and hold to delete",
+                    if (searching) "Matching chats" else "Recent chats",
                     style = MaterialTheme.typography.titleSmall,
                     color = scheme.primary,
                     modifier = Modifier.padding(start = 4.dp, top = 8.dp),
@@ -299,19 +295,19 @@ private fun ChatList(
 @Composable
 private fun ChatRow(chat: ChatStore.Chat, snippet: String, isOpen: Boolean, onOpen: () -> Unit, onDelete: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    var menu by remember { mutableStateOf(false) }
     val now = System.currentTimeMillis()
     val whenText = DateUtils.getRelativeTimeSpanString(chat.updated, now, DateUtils.MINUTE_IN_MILLIS).toString()
-    Box {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = scheme.surfaceBright,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onLongClickLabel = "Delete options"),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(20.dp),
+        color = scheme.surfaceBright,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                Modifier.weight(1f).padding(start = 16.dp, top = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(chat.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (snippet.isNotBlank()) {
                     Text(snippet, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -322,13 +318,10 @@ private fun ChatRow(chat: ChatStore.Chat, snippet: String, isOpen: Boolean, onOp
                     color = scheme.onSurfaceVariant,
                 )
             }
-        }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text("Delete") },
-                leadingIcon = { Icon(Icons.Rounded.Delete, null) },
-                onClick = { menu = false; onDelete() },
-            )
+            // Deleting is one tap here; the Undo snackbar covers a mistaken one.
+            IconButton(onClick = onDelete, modifier = Modifier.padding(end = 4.dp)) {
+                Icon(Icons.Rounded.Delete, contentDescription = "Delete ${chat.title}", tint = scheme.onSurfaceVariant)
+            }
         }
     }
 }
