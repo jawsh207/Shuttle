@@ -29,6 +29,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import app.shuttle.assistant.llm.PersonalityPrefs
+import app.shuttle.assistant.llm.Personality
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -95,6 +101,7 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
     var specialOpen by rememberSaveable { mutableStateOf(true) }
     var chatsOpen by rememberSaveable { mutableStateOf(true) }
     var modelOpen by rememberSaveable { mutableStateOf(true) }
+    var personalityOpen by rememberSaveable { mutableStateOf(true) }
     var confirmDeleteModel by rememberSaveable { mutableStateOf(false) }
     if (confirmDeleteModel) {
         AlertDialog(
@@ -167,6 +174,8 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 }
 
                 ModelSection(modelOpen, onToggle = { modelOpen = !modelOpen }, onDelete = { confirmDeleteModel = true }) { refresh++ }
+
+                PersonalitySection(personalityOpen) { personalityOpen = !personalityOpen }
 
                 val runtime = buildList {
                     add(Access.CONTACTS to "Find people by name for calls and texts.")
@@ -289,6 +298,50 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 }
             }
         }
+    }
+}
+
+/**
+ * How the model talks ([Personality]): one choice, kept on the phone and used from the next
+ * answer on. Phone commands reply the same whichever is chosen.
+ */
+@Composable
+private fun PersonalitySection(expanded: Boolean, onToggle: () -> Unit) {
+    val context = LocalContext.current
+    var chosen by remember { mutableStateOf(PersonalityPrefs.get(context)) }
+    Section("Personality", summary = chosen.label, expanded = expanded, onToggle = onToggle) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.selectableGroup().padding(vertical = 8.dp)) {
+                for (p in Personality.entries) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = p == chosen, role = Role.RadioButton) {
+                                chosen = p
+                                PersonalityPrefs.set(context, p)
+                            }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = p == chosen, onClick = null)
+                        Column(Modifier.padding(start = 16.dp)) {
+                            Text(p.label, style = MaterialTheme.typography.titleMedium)
+                            Text(p.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+        Text(
+            "Changes how the model answers questions. Phone commands reply the same either way.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 }
 
