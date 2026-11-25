@@ -166,8 +166,8 @@ jobs:
 
       # No release key set yet: build the test APK (the optimized release build, signed with the
       # throwaway test key committed at app/debug.keystore), so every push still gives
-      # something to install and test. It has the real package name (app.shuttle.assistant),
-      # so moving to release-key builds later means uninstalling it first.
+      # something to install and test. It installs alongside release builds (its package name
+      # ends in .debug) and updates a debug build in place.
       - name: Build test APK (no release key)
         if: env.HAS_SIGNING != 'true'
         shell: bash
