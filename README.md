@@ -22,7 +22,7 @@ Both run the same commands the same way.
 
 Chats in the full-screen view are saved as you go, on the phone only. Tap the search bar to see
 them, newest first, and type to search every chat. Tap one to reopen it, or tap its trash button to
-delete it (with Undo). **New chat** is at the top of that list, and the **+** next to the gear
+delete it (after confirming, with Undo). **New chat** is at the top of that list, and the **+** next to the gear
 starts one straight away. Each time you open Shuttle from the launcher, it starts a new chat.
 
 Reopened chats are read-only history for anything that was waiting on you: an old "Send?" card

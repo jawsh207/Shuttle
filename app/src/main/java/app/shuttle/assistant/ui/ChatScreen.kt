@@ -46,6 +46,8 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
@@ -120,6 +122,18 @@ fun ChatScreen(
         }
     }
 
+    // The trash button asks first; Undo stays for a moment after, too.
+    var confirmDelete by remember { mutableStateOf<ChatStore.Chat?>(null) }
+    confirmDelete?.let { chat ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("Delete this chat?") },
+            text = { Text("\"${chat.title}\" is removed from this phone.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = null; delete(chat) }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
+        )
+    }
+
     Scaffold(
         topBar = {
             SearchBarPill(
@@ -146,7 +160,7 @@ fun ChatScreen(
                 padding = padding,
                 onNewChat = { newChat() },
                 onOpen = { chat -> vm.open(chat); query = null },
-                onDelete = { delete(it) },
+                onDelete = { confirmDelete = it },
             )
         } else {
             AssistantPanel(
@@ -322,7 +336,7 @@ private fun ChatRow(chat: ChatStore.Chat, snippet: String, isOpen: Boolean, onOp
                     color = scheme.onSurfaceVariant,
                 )
             }
-            // Deleting is one tap here; the Undo snackbar covers a mistaken one.
+            // Asks before deleting (in ChatScreen); Undo is offered afterwards too.
             IconButton(onClick = onDelete, modifier = Modifier.padding(end = 4.dp)) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Delete ${chat.title}", tint = scheme.onSurfaceVariant)
             }

@@ -27,7 +27,7 @@ Chats in this view are **saved as you go** (`chats/ChatStore.kt`): one small tex
 in the app's private folder, which only Shuttle can read. Android backup is off for the app,
 so nothing leaves the phone. Tapping the search bar turns the page into the list of saved chats,
 newest first, with New chat at the top; typing searches every chat; tapping one reopens it;
-each has a trash button that deletes it, with Undo. Back from the list, search or Settings returns to the chat; back from the chat closes the app. The + beside the gear starts a new chat. A
+each has a trash button that deletes it after a confirmation, with Undo. Back from the list, search or Settings returns to the chat; back from the chat closes the app. The + beside the gear starts a new chat. A
 saved chat keeps only text, so a card that was waiting for Send or Allow comes back as plain
 text and can never be acted on later. The assist panel's quick commands aren't saved.
 
