@@ -90,7 +90,7 @@ object ToolSchemas {
         ToolSpec(
             "quick_setting",
             "Turn a Quick Settings tile on or off, or tap it, by the name shown on it (battery saver, night light, " +
-                "extra dim, data saver, screen record…). Needs Quick Settings control turned on.",
+                "extra dim, data saver, screen record and so on). Needs Quick Settings control turned on.",
             listOf(Param("name", ParamType.STRING, "The tile's name."), StateParam),
         ),
         ToolSpec("battery_status", "Report the battery level and whether the phone is charging."),
