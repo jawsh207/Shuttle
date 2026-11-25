@@ -164,19 +164,20 @@ jobs:
               print(f"::error title=Build errors {n}/{len(chunks)}::{msg}")
           PYEOF
 
-      # No release key set yet: build a debug APK signed with the throwaway test key committed
-      # at app/debug.keystore, so every push still gives something to install and test. It
-      # installs alongside release builds (its package name ends in .debug).
-      - name: Build debug APK (no release key)
+      # No release key set yet: build the test APK (the optimized release build, signed with the
+      # throwaway test key committed at app/debug.keystore), so every push still gives
+      # something to install and test. It installs alongside release builds (its package name
+      # ends in .debug) and updates a debug build in place.
+      - name: Build test APK (no release key)
         if: env.HAS_SIGNING != 'true'
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew --stacktrace assembleDebug 2>&1 | tee -a build.log
+          ./gradlew --stacktrace assemblePreview 2>&1 | tee -a build.log
           mkdir -p out-debug
-          cp app/build/outputs/apk/debug/app-debug.apk "out-debug/Shuttle-debug-${SHUTTLE_VERSION_NAME}.apk"
+          cp app/build/outputs/apk/preview/app-preview.apk "out-debug/Shuttle-debug-${SHUTTLE_VERSION_NAME}.apk"
           ls -la out-debug
-          echo "::warning title=Debug build only::No release signing key is set, so this run published a debug APK signed with the throwaway test key. Add the SHUTTLE_KEYSTORE_* secrets (README › Signing) for release builds."
+          echo "::warning title=Test build only::No release signing key is set, so this run published a test APK signed with the throwaway test key. Add the SHUTTLE_KEYSTORE_* secrets (README › Signing) for release builds."
 
       - uses: actions/upload-artifact@v4
         if: env.HAS_SIGNING != 'true'

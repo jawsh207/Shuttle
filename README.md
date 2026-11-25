@@ -90,6 +90,8 @@ limit, and nothing you ask leaves the phone, except the words of a web search (b
   later openings restore it in a moment and each question only has to read your words. The
   build used (Q4_0) is one llama.cpp runs especially fast on phone CPUs. Replies stream in as
   they're written, and **Stop** works at any point.
+- **Answers:** short and to the point, with lists, bold and code shown as formatting (and read
+  aloud without the markup).
 - **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
   after ten quiet minutes.
 - **Knowledge date:** the model doesn't know exactly when its training data ends, so it's told
@@ -168,14 +170,17 @@ Shuttle's release key; download it from the run's **Artifacts** under **Actions 
 Each build has a higher version code, so it installs as an update over the last one.
 
 Until the release signing secrets are set (see [Signing](#signing)), each run instead publishes
-**Shuttle-debug-…**, a debug APK signed with a throwaway test key that's kept in the repository
-(`app/debug.keystore`). It installs next to release builds as *Shuttle Debug*, and each debug
-build updates the last one. It's for testing only: the key is public, and releases never use it.
+**Shuttle-debug-…**: the same optimized build (the `preview` build type, so it opens at full
+speed), signed with a throwaway test key that's kept in the repository (`app/debug.keystore`).
+It installs next to release builds as *Shuttle Debug*, and each one updates the last (including
+older, debuggable test builds), keeping the model and chats. It's for testing only: the key is
+public, and releases never use it.
 
 The repository includes llama.cpp as a git submodule, so clone with
 `git clone --recursive` (or run `git submodule update --init` after cloning).
 
-To build locally: `./gradlew assembleRelease` (or `assembleDebug`). Unit tests:
+To build locally: `./gradlew assembleRelease`, `assemblePreview` (optimized, test key) or
+`assembleDebug` (debuggable, much slower to open). Unit tests:
 `./gradlew testDebugUnitTest`. Requires JDK 17, an Android SDK with compileSdk 37, and the Android NDK and CMake (Android Studio
 installs both when asked).
 

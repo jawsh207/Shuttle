@@ -69,6 +69,15 @@ class AssistantViewModel : ViewModel() {
     val exchanges = mutableStateListOf<Exchange>()
     private var nextId = 0
 
+    /** Where the earlier chat sent to the model starts (an exchange id); see [conversation]. */
+    private var historyFrom = 0
+
+    /**
+     * Roughly 3,000 tokens of earlier chat: enough to follow up on a long answer, while leaving
+     * room in the 8K context for instructions and the reply.
+     */
+    private val HISTORY_BUDGET = 12000
+
     /**
      * True while the user is away in Settings granting a special access, so the assistant
      * panel stays open for them to come back and tap "Try again".
@@ -93,6 +102,7 @@ class AssistantViewModel : ViewModel() {
     /** Leaves the current chat (already saved) and starts an empty one. */
     fun newChat() {
         exchanges.clear()
+        historyFrom = 0
         chatId = null
         awaitingSettings = false
     }
@@ -100,6 +110,7 @@ class AssistantViewModel : ViewModel() {
     /** Shows a saved chat; anything said next is added to it. */
     fun open(chat: ChatStore.Chat) {
         exchanges.clear()
+        historyFrom = 0
         chat.lines.forEach {
             exchanges += Exchange(nextId++, it.asked, resultOf(it), settled = true, fromModel = it.kind == ChatStore.Kind.MODEL)
         }
@@ -368,33 +379,38 @@ class AssistantViewModel : ViewModel() {
 
     /** The recent conversation as model messages, newest last, within a size budget. */
     private fun conversation(): List<GranitePrompt.Message> {
-        val messages = ArrayDeque<GranitePrompt.Message>()
-        // Roughly 3,000 tokens of earlier chat: enough to follow up on a long answer, while
-        // leaving room in the 8K context for instructions and the reply.
-        var budget = 12000
-        for (e in exchanges.asReversed()) {
-            // Only real answers are context. Shuttle's own notes (errors, "Stopped.", "the model
-            // isn't downloaded") would just be copied into the next reply.
-            val answer = if (e.result is ToolResult.Failed || e.thinking || e.result.text == STOPPED) "" else e.result.text.trim()
-            if (answer.isNotEmpty()) {
-                val prev = messages.firstOrNull()
-                // Several results for one request read as one answer.
-                if (prev?.role == GranitePrompt.Role.ASSISTANT) {
-                    messages[0] = prev.copy(content = answer + "\n" + prev.content)
-                } else {
-                    messages.addFirst(GranitePrompt.Message(GranitePrompt.Role.ASSISTANT, answer))
-                }
-                budget -= answer.length
+        // Only real answers are context. Shuttle's own notes (errors, "Stopped.", "the model
+        // isn't downloaded") would just be copied into the next reply.
+        fun answerOf(e: Exchange) = if (e.result is ToolResult.Failed || e.thinking || e.result.text == STOPPED) "" else e.result.text.trim()
+        fun cost(e: Exchange) = e.asked.length + answerOf(e).length
+        // The window of earlier chat starts at [historyFrom] and only ever moves forward, in
+        // big steps: when it outgrows the budget, the oldest turns are dropped until it's down
+        // to half. Dropping one turn per question instead would change the start of the
+        // prompt every time, and the model would have to re-read the whole chat each time.
+        var window = exchanges.filter { it.id >= historyFrom }
+        if (window.sumOf(::cost) > HISTORY_BUDGET) {
+            var total = window.sumOf(::cost)
+            var drop = 0
+            while (drop < window.size - 1 && total > HISTORY_BUDGET / 2) total -= cost(window[drop++])
+            window = window.drop(drop)
+            historyFrom = window.first().id
+        }
+        val messages = ArrayList<GranitePrompt.Message>()
+        for (e in window) {
+            if (e.asked.isNotBlank()) messages += GranitePrompt.Message(GranitePrompt.Role.USER, e.asked)
+            val answer = answerOf(e)
+            if (answer.isEmpty()) continue
+            val prev = messages.lastOrNull()
+            // Several results for one request read as one answer.
+            if (prev?.role == GranitePrompt.Role.ASSISTANT) {
+                messages[messages.size - 1] = prev.copy(content = prev.content + "\n" + answer)
+            } else {
+                messages += GranitePrompt.Message(GranitePrompt.Role.ASSISTANT, answer)
             }
-            if (e.asked.isNotBlank()) {
-                messages.addFirst(GranitePrompt.Message(GranitePrompt.Role.USER, e.asked))
-                budget -= e.asked.length
-            }
-            if (budget <= 0) break
         }
         // The prompt must start with the user.
-        while (messages.firstOrNull()?.role == GranitePrompt.Role.ASSISTANT) messages.removeFirst()
-        return messages.toList()
+        while (messages.firstOrNull()?.role == GranitePrompt.Role.ASSISTANT) messages.removeAt(0)
+        return messages
     }
 
     private fun replace(id: Int, change: (Exchange) -> Exchange) {

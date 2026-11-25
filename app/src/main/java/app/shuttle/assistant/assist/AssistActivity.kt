@@ -63,7 +63,7 @@ class AssistActivity : ComponentActivity() {
         ModelManager.start(this)
         // Load the model and read its instructions now, so the first question is quick.
         LocalModel.configure(ModelPrompts.prefix(), File(filesDir, "model-state"))
-        ModelManager.ready?.let { LocalModel.prepare(it.file) }
+        ModelManager.ready?.let { LocalModel.prepareAfterFirstFrame(it.file) }
         val prefs = VoicePrefs(this)
         val session = VoiceSession(this).also { voice = it }
         // Listen on open only for a fresh panel, not when it's recreated after rotation.

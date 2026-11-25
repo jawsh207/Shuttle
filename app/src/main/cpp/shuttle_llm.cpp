@@ -175,7 +175,12 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
     if (temperature <= 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
     } else {
+        // A light penalty on the last 64 tokens written keeps a small model from looping
+        // through the same list item or sentence; min_p drops the unlikely tail that makes
+        // answers wander.
+        llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(e->vocab), 64, 1.05f, 0.0f, 0.0f));
         llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.95f, 1));
+        llama_sampler_chain_add(smpl, llama_sampler_init_min_p(0.05f, 1));
         llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature));
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
     }

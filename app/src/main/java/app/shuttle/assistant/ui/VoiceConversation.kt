@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.engine.Replies
 import app.shuttle.assistant.engine.ToolResult
+import app.shuttle.assistant.text.Markdown
 import app.shuttle.assistant.tools.hasAccess
 import app.shuttle.assistant.voice.VoiceSession
 
@@ -116,6 +117,7 @@ class VoiceConversation(
         is ToolResult.Confirm ->
             if (result.text.trimEnd().endsWith("?")) result.text
             else "${result.text.trimEnd('.', ' ')}. ${result.confirmLabel} it?"
-        else -> result.text
+        // Read the words, not the Markdown ("asterisk asterisk").
+        else -> Markdown.plain(result.text)
     }
 }

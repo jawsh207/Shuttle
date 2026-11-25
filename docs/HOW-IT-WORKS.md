@@ -86,8 +86,9 @@ settings, where Android keeps the "Voice input" choice.
      the opposite ("Wi-Fi is on. Turn it off?"). Android hides the hotspot's state from apps,
      so that question offers its settings instead. The flashlight's state only arrives through
      a notification from Android, which Shuttle starts listening for when the panel opens.
-5. **A card shows what happened** (`ui/AssistantPanel.kt`). The conversation itself is kept by
-   `ui/AssistantViewModel.kt`.
+5. **A card shows what happened** (`ui/AssistantPanel.kt`), with any Markdown in an answer
+   shown as formatting and left out when it's read aloud (`text/Markdown.kt`). The
+   conversation itself is kept by `ui/AssistantViewModel.kt`.
 
 If the fast path doesn't recognise the command, `engine/SmallTalk.kt` checks for the social
 things people say (hello, thanks, "what can you do?", "never mind", which closes the panel).
@@ -108,10 +109,12 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   On a phone's CPU, reading a prompt is far slower than writing the answer, and every prompt
   starts with the same instructions and tool list. That start is read only once per model:
   the result is saved to a file in the app's private storage, and every later load restores it
-  in a moment. Loading and restoring happen as soon as Shuttle opens, so a question only has to
-  read its own words. The instructions never change, so the saved copy stays valid; the date
+  in a moment. Loading and restoring start as soon as Shuttle has drawn its first frame (not
+  before, so the screen isn't slowed down), and a question only has to read its own words. The instructions never change, so the saved copy stays valid; the date
   goes in a separate short note after them. The model's memory (about 3 GB) is freed after ten
-  quiet minutes. The conversation is capped at 8,000 tokens.
+  quiet minutes. The conversation is capped at 8,000 tokens. Replies can run to about 1,000
+  tokens. Sampling is gentle (temperature 0.3, with min-p and a light repeat penalty so a
+  small model doesn't loop through the same list item).
 - **Stopping.** Stop asks the native code to abort, which llama.cpp checks during every step of
   its work, so it stops even while a long prompt is still being read.
 - **Getting the model.** `llm/ModelManager.kt` keeps track of it and `llm/ModelDownloadService.kt`
@@ -127,10 +130,14 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   (from its published chat template, with thinking off so answers start straight away) and
   reads tool calls out of the reply, hiding any stray thinking markers. `llm/ModelPrompts.kt`
   holds the instructions it's given: a general assistant first (questions, explanations,
-  recipes, advice), concise, using the phone's tools only when asked to do something on the
-  phone, searching the web for anything current, and never naming a knowledge cutoff year
-  (it can't know it). Earlier turns of the chat (roughly the last 3,000 tokens) go along as context, and
-  the model is told to treat short or vague messages as follow-ups and to build on its earlier
+  recipes, advice), starting with the answer and matching its length to the question, light
+  Markdown for lists and key terms, using the phone's tools only when asked to do something on
+  the phone, searching the web for anything current, and never naming a knowledge cutoff year
+  (it can't know it). Earlier turns of the chat go along as context: a window of up to roughly
+  3,000 tokens whose start stays put; when it outgrows that, the oldest turns are dropped until
+  it's down to half. Dropping one turn per question would change the start of every prompt and
+  make the model re-read the whole chat each time. The model
+  is told to treat short or vague messages as follow-ups and to build on its earlier
   answers when asked to continue, expand or change one. Only real answers are sent: Shuttle's
   own notes (errors, "Stopped.") are left out so the model doesn't repeat them.
 - **Searching the web.** `search/WebSearch.kt` asks DuckDuckGo's plain-HTML results page, then
@@ -200,6 +207,8 @@ timers are created in your own clock app, which rings them.
 | `ui/SettingsScreen.kt` | Assistant role, permissions, special access and voice settings |
 | `assist/AssistActivity.kt` | The assistant panel over other apps |
 | `ui/AssistantPanel.kt` | Conversation, input box and result cards |
+| `ui/MarkdownText.kt` | Answers drawn with their formatting (lists, bold, code, links) |
+| `text/Markdown.kt` | Reading the model's Markdown; plain words for speaking replies |
 | `ui/AssistantViewModel.kt` | Holds the conversation; runs commands, confirmations and retries |
 | `ui/VoiceConversation.kt` | Listen, run, speak the answer, ask yes/no for calls and texts |
 | `voice/VoiceSession.kt` | The phone's speech recogniser and text-to-speech engine |

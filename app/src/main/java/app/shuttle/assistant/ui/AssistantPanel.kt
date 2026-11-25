@@ -267,6 +267,9 @@ private fun ResultCard(
                         Text(exchange.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            } else if (result is ToolResult.Done) {
+                // Answers (the model's especially) may carry Markdown; show it as formatting.
+                MarkdownText(result.text)
             } else {
                 Text(result.text, style = MaterialTheme.typography.bodyLarge)
             }

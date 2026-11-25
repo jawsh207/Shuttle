@@ -1,6 +1,7 @@
 package app.shuttle.assistant.llm
 
 import android.os.Handler
+import android.view.Choreographer
 import android.os.Looper
 import java.io.File
 import java.util.concurrent.Executors
@@ -13,8 +14,8 @@ import java.util.concurrent.Executors
  * every prompt starts with the same instructions and tool list. That shared start is read only
  * once per model: afterwards its state is saved to a file ([configure]'s folder), and every
  * later load restores it in a moment instead of reading it again. [prepare] does this as soon
- * as the assistant opens, so a request only has to read the new words. The model holds about 3 GB while loaded and is let go after ten quiet
- * minutes. The context is capped at 8K tokens, plenty for an assistant and far less memory
+ * as the assistant opens (just after its first frame), so a request only has to read the new
+ * words. The model holds about 3 GB while loaded and is let go after ten quiet minutes. The context is capped at 8K tokens, plenty for an assistant and far less memory
  * than the model's full 128K.
  */
 object LocalModel {
@@ -89,6 +90,16 @@ object LocalModel {
     }
 
     /**
+     * [prepare], once the screen has drawn its first frame. Loading 2 GB and restoring the
+     * saved instructions keeps the CPU and storage busy for a moment, so starting it in the
+     * same instant as the screen would slow the screen down; a question asked before then
+     * simply waits for it.
+     */
+    fun prepareAfterFirstFrame(file: File) {
+        Choreographer.getInstance().postFrameCallback { main.post { prepare(file) } }
+    }
+
+    /**
      * Writes a reply to [prompt] with the model in [file]. [onEvent] is called on the main
      * thread with the growing raw text, then once with [Event.Finished] or [Event.Failed].
      * [shouldStop] can end it early once it has seen enough (it gets the raw text so far).
@@ -96,7 +107,7 @@ object LocalModel {
     fun generate(
         file: File,
         prompt: String,
-        maxTokens: Int = 512,
+        maxTokens: Int = 1024,
         temperature: Float = 0.3f,
         shouldStop: (String) -> Boolean = { false },
         onEvent: (Event) -> Unit,
