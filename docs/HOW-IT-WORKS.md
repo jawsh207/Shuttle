@@ -195,7 +195,9 @@ notification list), and if the tiles shown don't change, swipes across them inst
 switch's tile isn't found, its fallback panel says so and lists the tiles that were found. Mobile data never uses a Wi-Fi tile or switch. It looks on every page for a
 tile called Mobile data (or one named after the carrier that mentions LTE, 5G and so on).
 Only then does it try the combined Internet tile, and only through its dialog: an Internet
-tile that switches by itself is Wi-Fi's, so the tap is undone. A tile that opens a dialog (Internet, Bluetooth) has the right
+tile that switches by itself is Wi-Fi's, so the tap is undone. Android's own confirmations ("Turn off mobile data?") are
+answered with the matching button. A dialog Shuttle can't work out is left open, and the
+reply quotes what it showed. A tile that opens a dialog (Internet, Bluetooth) has the right
 switch in the dialog used instead. This watches the screen for a second or two, so it runs on
 its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
 several commands in one sentence wait for each other. If no tile matches, a switch falls back

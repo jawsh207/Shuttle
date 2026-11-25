@@ -205,7 +205,11 @@ object QuickTiles {
             close(svc)
             return Outcome.Done("$name is already ${word(want)}.")
         }
-        val switchesBefore = switches(svc).map { it.second }.toSet()
+        // What's on screen before the tap, to spot a dialog it opens. Keyed by name without the
+        // state, so a tile whose label changes from "On" to "Off" isn't mistaken for a new switch.
+        val switchesBefore = switches(svc).map { key(it.second) }.toSet()
+        val textsBefore = texts(svc).toSet()
+        val target = want ?: before?.let { !it }
         // Tap the best match; if Android refuses, the next one that looks like the same tile.
         if (matches.filter { it.tileness >= tile.tileness - 10 }.take(3).none { tap(svc, it.node) }) {
             close(svc)
@@ -232,8 +236,18 @@ object QuickTiles {
                 close(svc)
                 return Outcome.Done("$name ${word(after)}.")
             }
-            val dialog = switches(svc).filter { it.second !in switchesBefore }
-            if (dialog.isNotEmpty()) return useDialog(svc, call, names, dialog, want, name)
+            // "Turn off mobile data?": Android's own confirmation. Answer it as asked.
+            if (target != null) confirmButton(svc, textsBefore, target)?.let { button ->
+                tap(svc, button)
+                Thread.sleep(600)
+                val state = tiles(svc)
+                    .filter { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
+                    .maxByOrNull { it.tileness }?.state
+                close(svc)
+                return Outcome.Done("$name ${word(state ?: target)}.")
+            }
+            val dialog = switches(svc).filter { key(it.second) !in switchesBefore }
+            if (dialog.isNotEmpty()) return useDialog(svc, call, names, dialog, want, name, textsBefore)
         }
         if (before == null) {
             // A tile that opens something (screen record, cast): leave it for the user.
@@ -251,13 +265,18 @@ object QuickTiles {
         dialog: List<Pair<AccessibilityNodeInfo, String>>,
         want: Boolean?,
         tileName: String,
+        textsBefore: Set<String>,
     ): Outcome {
         val labels = dialog.map { it.second }
         val wanted = QuickTileNames.dialogSwitch[call.name] ?: names
         val index = QuickTileNames.best(labels, wanted)
             // Internet's dialog has Wi-Fi and the carrier's mobile data; mobile data is the other one.
             ?: (if (call.name == "mobile_data") labels.indices.filter { !QuickTileNames.isWifi(labels[it]) } else dialog.indices.toList()).singleOrNull()
-        if (index == null) return Outcome.Done("$tileName opened its settings; switch it there.")
+        if (index == null) {
+            // Say what appeared, so it can be finished by hand (and reported if it should work).
+            val shown = texts(svc).filter { it !in textsBefore }.take(3).joinToString(" / ")
+            return Outcome.Done("$tileName opened a dialog" + (if (shown.isNotEmpty()) " (\"$shown\")" else "") + "; finish it there.")
+        }
         val (node, label) = dialog[index]
         val isOn = node.isChecked
         val target = want ?: !isOn
@@ -348,6 +367,28 @@ object QuickTiles {
             val own = labelOf(n)
             n to (if (own.isNotBlank()) own else n.parent?.let(::labelOf).orEmpty())
         }
+
+    /** A label without its state: "Mobile data, Off" and "Mobile data, On" are one switch. */
+    private fun key(label: String) = QuickTileNames.normalize(QuickTileNames.display(label))
+
+    /** Every short text on the system UI's screens. */
+    private fun texts(svc: AccessibilityService): List<String> =
+        nodes(svc).mapNotNull { it.text?.toString()?.trim()?.takeIf { t -> t.isNotEmpty() && t.length <= 120 } }
+
+    /**
+     * The button that confirms switching [on] or off in a dialog that just appeared ("Turn off
+     * mobile data?" › Turn off), or null. Only buttons that weren't there before the tap count.
+     */
+    private fun confirmButton(svc: AccessibilityService, before: Set<String>, on: Boolean): AccessibilityNodeInfo? {
+        val words = if (on) listOf("turn on", "enable", "allow", "ok", "yes", "continue") else listOf("turn off", "disable", "ok", "yes", "continue")
+        // Buttons only: the dialog's title ("Turn off mobile data?") starts with the same words.
+        val found = nodes(svc).filter { n ->
+            val text = n.text?.toString()?.trim().orEmpty().lowercase()
+            (n.isClickable || n.parent?.isClickable == true) && text.isNotEmpty() && !text.endsWith("?") &&
+                n.text.toString().trim() !in before && words.any { w -> text == w || text.startsWith("$w ") }
+        }
+        return found.firstOrNull { it.isClickable && it.text.toString().trim().lowercase() in words } ?: found.firstOrNull { it.isClickable } ?: found.firstOrNull()
+    }
 
     /** The labels of the tiles on screen now, to tell whether a page turn worked. */
     private fun visibleTiles(svc: AccessibilityService): Set<String> =
