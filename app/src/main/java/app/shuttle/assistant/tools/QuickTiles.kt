@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -59,12 +60,16 @@ object QuickTiles {
         return list.split(':').any { ComponentName.unflattenFromString(it) == me }
     }
 
-    /** The service's own page in Accessibility settings where there is one, else the list. */
+    /**
+     * Android's Accessibility page, scrolled to Shuttle's entry where Settings supports that.
+     * Not the service's own page: its action needs a permission only system apps hold, and
+     * opening it threw.
+     */
     fun settingsIntent(context: Context): Intent {
-        val details = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
-            .putExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName(context, QuickTilesService::class.java).flattenToString())
-        return if (Build.VERSION.SDK_INT >= 33 && details.resolveActivity(context.packageManager) != null) details
-        else Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        val me = ComponentName(context, QuickTilesService::class.java).flattenToString()
+        return Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .putExtra(":settings:fragment_args_key", me)
+            .putExtra(":settings:show_fragment_args", Bundle().apply { putString(":settings:fragment_args_key", me) })
     }
 
     /** Whether [call] is done by tapping a tile right now (then use [run], not [DeviceTools.run]). */

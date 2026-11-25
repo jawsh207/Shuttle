@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.llm.ModelManager
+import app.shuttle.assistant.tools.launch
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.platform.LocalContext
@@ -220,7 +221,7 @@ private fun ModelNotice() {
             Text(text, style = MaterialTheme.typography.bodyMedium)
             if (state is ModelManager.State.Failed && state.networkBlocked) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { context.startActivity(ModelManager.appInfoIntent(context)) }) { Text("App info") }
+                    Button(onClick = { context.launch(ModelManager.appInfoIntent(context)) }) { Text("App info") }
                     OutlinedButton(onClick = { ModelManager.download(context) }) { Text("Try again") }
                 }
             } else if (state is ModelManager.State.Missing || state is ModelManager.State.Failed) {

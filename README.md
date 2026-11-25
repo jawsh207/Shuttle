@@ -141,8 +141,9 @@ Shuttle uses only what a normal app may do, so some switches need one tap from y
 
 ### Quick Settings control (optional)
 
-Turn on **Quick Settings control** (Settings › Special access, which opens Android's
-Accessibility page) and Shuttle switches these itself, the way you would: it opens Quick
+Turn on **Quick Settings control** (Settings › Special access › Open takes you to Android's
+Accessibility page; it's listed there as *Shuttle Quick Settings control*, sometimes under
+**Downloaded apps**) and Shuttle switches these itself, the way you would: it opens Quick
 Settings, taps the tile (paging through if it's not on the first page), checks that it changed
 and closes the shade again. That covers Wi-Fi, mobile data, NFC, Bluetooth, airplane mode,
 location, hotspot and dark theme, plus any other tile by name: battery saver, night light,

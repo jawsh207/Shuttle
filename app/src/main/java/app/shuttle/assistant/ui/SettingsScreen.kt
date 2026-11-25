@@ -158,10 +158,10 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                         action = "Choose",
                     ) {
                         // The Assistant role can't be requested with a dialog; the user picks it in Settings.
-                        context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                        context.launch(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
                     }
                     FilledTonalButton(
-                        onClick = { context.startActivity(Intent(context, AssistActivity::class.java)) },
+                        onClick = { context.launch(Intent(context, AssistActivity::class.java)) },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Try the assistant panel") }
                 }
@@ -271,7 +271,7 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 ) {
                     for ((access, why) in special) {
                         SetupRow(access.label, why, context.hasAccess(access), "Open") {
-                            context.accessSettingsIntent(access)?.let { context.startActivity(it) }
+                            context.accessSettingsIntent(access)?.let { context.launch(it) }
                         }
                     }
                     Text(
@@ -386,7 +386,7 @@ private fun ModelSection(expanded: Boolean, onToggle: () -> Unit, onDelete: () -
                         Text(state.message, style = small, color = MaterialTheme.colorScheme.error)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (state.networkBlocked) {
-                                Button(onClick = { context.startActivity(ModelManager.appInfoIntent(context)) }) { Text("App info") }
+                                Button(onClick = { context.launch(ModelManager.appInfoIntent(context)) }) { Text("App info") }
                                 OutlinedButton(onClick = { download() }) { Text("Try again") }
                             } else {
                                 Button(onClick = { download() }) { Text("Try again") }
