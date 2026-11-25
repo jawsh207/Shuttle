@@ -303,6 +303,14 @@ class CommandParserTest {
         check("turn on dark mode", call("dark_mode", "state" to "on"))
     }
 
+    @Test fun searchItAgain() {
+        check("search it", call("web_search", "query" to "it"))
+        check("yes, search it", call("web_search", "query" to "it"))
+        check("look it up", call("web_search", "query" to "it"))
+        check("yeah look that up for me", call("web_search", "query" to "it"))
+        check("go ahead and search", call("web_search", "query" to "it"))
+    }
+
     @Test fun reminders() {
         check("remind me to call Mom at 6", call("set_reminder", "text" to "call Mom", "when" to "at 6"))
         check("remind me to take out the trash tomorrow at 8", call("set_reminder", "text" to "take out the trash", "when" to "tomorrow at 8"))

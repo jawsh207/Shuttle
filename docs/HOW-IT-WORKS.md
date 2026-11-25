@@ -148,7 +148,11 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   current or likely to have changed. When it asks for `web_search`, or the user says "search
   for…"/"look up…", the search runs in the background ("Searching the web…"), the results go
   back to the model as the tool's answer, and it writes the reply from them, with the pages
-  listed as sources under it. One search per question. Only the search words are sent. Before
+  listed as sources under it. One search per question. Shuttle doesn't wait to be told, either
+  (`engine/SearchHints.kt`): a question plainly about now (news, scores, prices, who holds an
+  office, new releases, a recent year) is searched first, and an answer that turns out to be
+  "I don't have real-time information" or "want me to search?" is replaced by a search and a
+  fresh answer. "Search it" or "look it up" searches the question asked before. Only the search words are sent. Before
   the model is downloaded, a search shows the results themselves.
 - **Follow-ups versus commands.** Right after the model has answered, a few words that are
   otherwise phone commands ("continue", "next", "go back", "again") go to the model instead, so
@@ -255,6 +259,7 @@ timers are created in your own clock app, which rings them.
 | --- | --- |
 | `MainActivity.kt` | Launcher entry: the full-screen chat, with Settings over it |
 | `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
+| `engine/SearchHints.kt` | When to search without being asked: current questions, "I can't know" answers, "search it" |
 | `search/WebSearch.kt` | Web search: DuckDuckGo's HTML results, then Wikipedia |
 | `search/SearchResults.kt` | Reading DuckDuckGo's results page; results written out for the model |
 | `llm/LlamaEngine.kt` | Kotlin side of the native bridge to llama.cpp |

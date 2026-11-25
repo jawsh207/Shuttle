@@ -112,7 +112,10 @@ limit, and nothing you ask leaves the phone, except the words of a web search (b
 
 For anything current ("who's the current president of France?", "latest GrapheneOS release")
 the model searches the web first and answers from the results, which are listed as **Sources**
-under the answer; tap one to open it. You can also ask outright: "search for…", "look up…",
+under the answer; tap one to open it. Questions plainly about now (news, scores, prices, who holds an office) are searched
+straight away, and if the model ever answers "I don't have real-time information" instead,
+Shuttle searches and answers again rather than asking you to. You can also ask outright:
+"search for…", "look up…",
 "google…", "find out … online". Before the model is downloaded, a search shows the results
 themselves.
 

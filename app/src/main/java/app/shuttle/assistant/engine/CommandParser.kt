@@ -623,6 +623,10 @@ object CommandParser {
         })
 
         // Web search (after directions, so "find a pharmacy near me" stays a map search)
+        // "yes, search it", "look it up": search for the question before (the view model fills it in).
+        add(Rule("(?:yes|yeah|yep|sure|ok|okay|please)?[\\s,]*(?:please\\s+)?(?:go\\s+ahead\\s+and\\s+)?(?:look|search)\\s+(it|that|this)\\s+up(?:\\s+for\\s+me)?|(?:yes|yeah|yep|sure|ok|okay)[\\s,]+(?:please\\s+)?search(?:\\s+(?:it|that|for\\s+it|for\\s+that|online|the\\s+web))?|go\\s+ahead\\s+and\\s+search(?:\\s+(?:it|that))?") {
+            ToolCall("web_search", mapOf("query" to "it"))
+        })
         val web = "(?:the\\s+)?(?:web|internet|net|online)"
         add(Rule("(?:search|look|check)(?:\\s+up)?\\s+$web\\s+(?:for\\s+)?(.+)", verbatim = true) { ToolCall("web_search", mapOf("query" to it.groupValues[1].trim())) })
         add(Rule("(?:search|google|duckduckgo|look up|lookup)\\s+(?:for\\s+)?(?!(?:my\\s+)?(?:chats?|messages|contacts)\\b)(.+)", verbatim = true) {

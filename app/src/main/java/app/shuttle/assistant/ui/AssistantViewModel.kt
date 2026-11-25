@@ -13,6 +13,7 @@ import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.engine.CONFIRMED
 import app.shuttle.assistant.engine.CommandParser
 import app.shuttle.assistant.engine.InstantAnswers
+import app.shuttle.assistant.engine.SearchHints
 import app.shuttle.assistant.engine.SmallTalk
 import app.shuttle.assistant.engine.Source
 import app.shuttle.assistant.engine.ToolCall
@@ -36,8 +37,10 @@ import java.util.concurrent.Executors
  * recognise gets a short social reply when it's small talk ([SmallTalk]); anything else goes
  * to the on-device model once it's downloaded ([ModelManager], [LocalModel]). The model's
  * reply streams into its card, and any tools it asks for run through the same device tools,
- * so calls and texts still stop at a confirmation card. A web search (asked for outright, or
- * requested by the model) runs in the background, then the model answers from the results,
+ * so calls and texts still stop at a confirmation card. A web search (asked for outright,
+ * requested by the model, for a question plainly about now, or after the model answers "I
+ * don't have real-time information": see SearchHints) runs in the background, then the model
+ * answers from the results,
  * which are listed as sources under the answer; without the model, the results are shown. Before the model is downloaded, the
  * answer says so and points to Settings.
  * Tools are run with the activity as context so they can open panels and other apps over it.
@@ -166,7 +169,17 @@ class AssistantViewModel : ViewModel() {
         if (inModelChat && CommandParser.isFollowUp(asked)) return askModel(context, asked, model!!, after)
         val calls = CommandParser.parseAll(asked)
         calls.singleOrNull()?.takeIf { it.name == "web_search" }?.let { search ->
-            val query = search.args["query"] ?: asked
+            var query = search.args["query"] ?: asked
+            // "search it": the question asked before this one.
+            if (SearchHints.refersBack(query)) {
+                val previous = exchanges.lastOrNull { it.asked.isNotBlank() }?.asked
+                if (previous == null) {
+                    exchanges += Exchange(nextId++, asked, ToolResult.Failed("Search for what? Ask your question and I'll look it up."))
+                    persist()
+                    return after(false)
+                }
+                query = SearchHints.queryFor(previous)
+            }
             return if (model != null) askModel(context, asked, model, after, search = query) else searchOnly(asked, query, after)
         }
         if (calls.isNotEmpty()) {
@@ -188,7 +201,9 @@ class AssistantViewModel : ViewModel() {
             persist()
             return after(false)
         }
-        askModel(context, asked, model, after)
+        // Plainly about now (news, scores, prices, who holds an office): search first rather than
+        // let the model guess from what it learned in training.
+        askModel(context, asked, model, after, search = if (SearchHints.isCurrent(asked)) SearchHints.queryFor(asked) else null)
     }
 
     private var stopped = false
@@ -268,6 +283,12 @@ class AssistantViewModel : ViewModel() {
                     if (search != null && round == 0 && !stopped) {
                         val query = search.args["query"]?.takeIf { it.isNotBlank() } ?: asked
                         return@generate searchThenAnswer(context, model, messages, placeholderId, query, event.raw.trim(), after)
+                    }
+                    // "I don't have real-time information" or "want me to search?": search now and
+                    // answer again, instead of making the user ask twice.
+                    if (round == 0 && !stopped && calls.isEmpty() && SearchHints.isDeferral(text)) {
+                        val query = SearchHints.queryFor(asked)
+                        return@generate searchThenAnswer(context, model, messages, placeholderId, query, searchCall(query), after)
                     }
                     thinking = false
                     val actions = calls.filter { it.name != "web_search" }
