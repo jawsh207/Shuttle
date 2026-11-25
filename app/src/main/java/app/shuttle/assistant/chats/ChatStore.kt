@@ -17,7 +17,8 @@ import java.io.File
  */
 class ChatStore(private val dir: File) {
 
-    enum class Kind { DONE, FAILED, CONFIRM, ACCESS }
+    /** MODEL is an answer the model wrote, so a reopened chat still treats "continue" as a follow-up. */
+    enum class Kind { DONE, FAILED, CONFIRM, ACCESS, MODEL }
 
     data class Line(val asked: String, val kind: Kind, val text: String)
 

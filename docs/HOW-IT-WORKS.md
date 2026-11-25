@@ -129,8 +129,15 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   holds the instructions it's given: a general assistant first (questions, explanations,
   recipes, advice), concise, using the phone's tools only when asked to do something on the
   phone, and saying its knowledge may be out of date for things that change, since it can't
-  go online. Earlier turns of the chat go along as context, but only real answers: Shuttle's
-  own notes (errors, "Stopped.") are left out so the model doesn't repeat them. To keep that start short and unchanging, it holds only the date (not the time), and
+  go online. Earlier turns of the chat (roughly the last 3,000 tokens) go along as context, and
+  the model is told to treat short or vague messages as follow-ups and to build on its earlier
+  answers when asked to continue, expand or change one. Only real answers are sent: Shuttle's
+  own notes (errors, "Stopped.") are left out so the model doesn't repeat them.
+- **Follow-ups versus commands.** Right after the model has answered, a few words that are
+  otherwise phone commands ("continue", "next", "go back", "again") go to the model instead, so
+  "continue" after a long answer carries on with it rather than starting the music; small talk
+  ("no", "thanks") also goes to the model, as a reply to what it said. Saved chats remember
+  which answers came from the model, so this works in a reopened chat too. To keep that start short and unchanging, it holds only the date (not the time), and
   the model sees a compact tool list: the twelve on/off switches are one "set switch" tool and
   every "is it on?" question is one "check setting" tool, which are turned back into the real
   tools before anything runs.

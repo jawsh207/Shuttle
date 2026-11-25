@@ -13,7 +13,7 @@ import java.nio.file.Files
 class ChatStoreTest {
 
     private val awkward = Line("text Sam: hi\tthere\nnew line \\ backslash", Kind.CONFIRM, "Text Sam: \"hi\"\t?")
-    private val chat = Chat("c1", "text Sam: hi", 100, 200, listOf(awkward, Line("", Kind.DONE, "Sent to Sam.")))
+    private val chat = Chat("c1", "text Sam: hi", 100, 200, listOf(awkward, Line("", Kind.DONE, "Sent to Sam."), Line("why", Kind.MODEL, "Because.")))
 
     @Test fun encodeDecodeRoundTrip() {
         assertEquals(chat, ChatStore.decode(ChatStore.encode(chat)))

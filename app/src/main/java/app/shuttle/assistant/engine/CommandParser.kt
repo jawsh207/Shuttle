@@ -45,6 +45,17 @@ object CommandParser {
         return null
     }
 
+    /**
+     * Words that are phone commands on their own but, right after the model has answered,
+     * almost always mean "carry on with that answer": "continue" after a reply that stopped
+     * short shouldn't start the music. The assistant sends these to the model in that case.
+     */
+    private val followUps = setOf(
+        "continue", "go on", "keep going", "next", "go back", "previous", "again", "more", "skip", "resume",
+    )
+
+    fun isFollowUp(input: String): Boolean = normalize(input).lowercase() in followUps
+
     private val joiners = Regex("\\s*,?\\s+(?:and then|and also|and|then|also|plus)\\s+|\\s*[,;]\\s*", IC)
 
     /**

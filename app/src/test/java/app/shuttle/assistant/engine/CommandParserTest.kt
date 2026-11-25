@@ -322,6 +322,14 @@ class CommandParserTest {
         }
     }
 
+    @Test fun followUpWords() {
+        assertEquals(true, CommandParser.isFollowUp("Continue."))
+        assertEquals(true, CommandParser.isFollowUp("go on please"))
+        assertEquals(true, CommandParser.isFollowUp("next"))
+        assertEquals(false, CommandParser.isFollowUp("next song"))
+        assertEquals(false, CommandParser.isFollowUp("flashlight on"))
+    }
+
     @Test fun normalizeStripsFiller() {
         assertEquals("turn on wifi", CommandParser.normalize("Hey Shuttle, can you turn on Wi Fi for me please?"))
         assertNull(CommandParser.parse("   "))

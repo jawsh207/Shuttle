@@ -49,6 +49,8 @@ class AssistantViewModel : ViewModel() {
         val thinking: Boolean = false,
         /** Shown while [thinking] before the first words: "Loading the model…", "Thinking…". */
         val status: String = "",
+        /** Written by the model (not a command result or a fixed reply). */
+        val fromModel: Boolean = false,
     )
 
     /** True while the model is writing; new requests wait (or the user stops it). */
@@ -89,7 +91,9 @@ class AssistantViewModel : ViewModel() {
     /** Shows a saved chat; anything said next is added to it. */
     fun open(chat: ChatStore.Chat) {
         exchanges.clear()
-        chat.lines.forEach { exchanges += Exchange(nextId++, it.asked, resultOf(it), settled = true) }
+        chat.lines.forEach {
+            exchanges += Exchange(nextId++, it.asked, resultOf(it), settled = true, fromModel = it.kind == ChatStore.Kind.MODEL)
+        }
         chatId = chat.id
         created = chat.created
         awaitingSettings = false
@@ -105,7 +109,9 @@ class AssistantViewModel : ViewModel() {
         if (!shouldSave() || exchanges.isEmpty()) return
         val now = System.currentTimeMillis()
         val id = chatId ?: "chat-$now".also { chatId = it; created = now }
-        val lines = exchanges.map { ChatStore.Line(it.asked, kindOf(it.result), it.result.text) }
+        val lines = exchanges.map {
+            ChatStore.Line(it.asked, if (it.fromModel) ChatStore.Kind.MODEL else kindOf(it.result), it.result.text)
+        }
         runCatching { s.save(ChatStore.Chat(id, ChatStore.titleFor(lines), created, now, lines)) }
     }
 
@@ -129,6 +135,11 @@ class AssistantViewModel : ViewModel() {
     fun submit(context: Context, text: String, after: (Boolean) -> Unit = {}) {
         val asked = text.trim()
         if (asked.isEmpty() || thinking) return after(false)
+        val model = ModelManager.ready
+        // Mid-conversation with the model, a follow-up like "continue" or "next" means "go on
+        // with that answer", not a phone command, and "no"/"thanks" are replies to it.
+        val inModelChat = model != null && exchanges.lastOrNull()?.fromModel == true
+        if (inModelChat && CommandParser.isFollowUp(asked)) return askModel(context, asked, model!!, after)
         val calls = CommandParser.parseAll(asked)
         if (calls.isNotEmpty()) {
             var close = false
@@ -140,12 +151,11 @@ class AssistantViewModel : ViewModel() {
             persist()
             return after(close)
         }
-        SmallTalk.reply(asked)?.let { chat ->
+        if (!inModelChat) SmallTalk.reply(asked)?.let { chat ->
             exchanges += Exchange(nextId++, asked, ToolResult.Done(chat.text, closePanel = chat.close))
             persist()
             return after(chat.close)
         }
-        val model = ModelManager.ready
         if (model == null) {
             exchanges += Exchange(nextId++, asked, ToolResult.Failed(noModelYet()))
             persist()
@@ -208,7 +218,11 @@ class AssistantViewModel : ViewModel() {
                     val calls = GranitePrompt.toolCalls(event.raw).mapNotNull(ModelPrompts::sanitize)
                     if (calls.isEmpty()) {
                         replace(placeholder.id) {
-                            it.copy(result = ToolResult.Done(text.ifBlank { if (stopped) STOPPED else "I don't have an answer for that." }), thinking = false)
+                            it.copy(
+                                result = ToolResult.Done(text.ifBlank { if (stopped) STOPPED else "I don't have an answer for that." }),
+                                thinking = false,
+                                fromModel = text.isNotBlank(),
+                            )
                         }
                         persist()
                         return@generate after(false)
@@ -220,7 +234,7 @@ class AssistantViewModel : ViewModel() {
                         val i = exchanges.indexOfFirst { it.id == placeholder.id }
                         if (i >= 0) exchanges.removeAt(i)
                     } else {
-                        replace(placeholder.id) { it.copy(result = ToolResult.Done(text), thinking = false) }
+                        replace(placeholder.id) { it.copy(result = ToolResult.Done(text), thinking = false, fromModel = true) }
                     }
                     calls.forEachIndexed { i, call ->
                         val result = DeviceTools.run(context, call)
@@ -238,7 +252,9 @@ class AssistantViewModel : ViewModel() {
     /** The recent conversation as model messages, newest last, within a size budget. */
     private fun conversation(): List<GranitePrompt.Message> {
         val messages = ArrayDeque<GranitePrompt.Message>()
-        var budget = 6000
+        // Roughly 3,000 tokens of earlier chat: enough to follow up on a long answer, while
+        // leaving room in the 8K context for instructions and the reply.
+        var budget = 12000
         for (e in exchanges.asReversed()) {
             // Only real answers are context. Shuttle's own notes (errors, "Stopped.", "the model
             // isn't downloaded") would just be copied into the next reply.
