@@ -24,6 +24,18 @@ class QuickTileNamesTest {
     }
 
     @Test
+    fun realTilesBeatStatusIcons() {
+        // The status bar's Wi-Fi icon matches "Wi-Fi" exactly; the Internet tile is the one to tap.
+        val labels = listOf("Wi-Fi, signal full", "Bluetooth", "Internet, Home", "Bluetooth, On")
+        val tile = setOf(2, 3)
+        val bonus = { i: Int -> if (i in tile) 15 else 0 }
+        assertEquals(2, QuickTileNames.ranked(labels, QuickTileNames.forSwitch.getValue("wifi"), bonus).first())
+        assertEquals(3, QuickTileNames.ranked(labels, listOf("Bluetooth"), bonus).first())
+        // Every match is kept, so a failed tap can try the next one.
+        assertEquals(listOf(3, 1), QuickTileNames.ranked(labels, listOf("Bluetooth"), bonus))
+    }
+
+    @Test
     fun readsState() {
         assertEquals(true, QuickTileNames.stateFrom("Wi-Fi, On, Home"))
         assertEquals(false, QuickTileNames.stateFrom("Off"))

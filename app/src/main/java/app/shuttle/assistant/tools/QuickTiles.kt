@@ -1,9 +1,12 @@
 package app.shuttle.assistant.tools
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Path
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -14,7 +17,9 @@ import app.shuttle.assistant.engine.Access
 import app.shuttle.assistant.engine.QuickTileNames
 import app.shuttle.assistant.engine.ToolCall
 import app.shuttle.assistant.engine.ToolResult
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Switching things by tapping their Quick Settings tile, through [QuickTilesService]: open the
@@ -113,7 +118,19 @@ object QuickTiles {
         data class NotFound(val seen: List<String>) : Outcome
     }
 
-    private class Tile(val node: AccessibilityNodeInfo, val label: String, val state: Boolean?)
+    private class Tile(val node: AccessibilityNodeInfo, val label: String, val state: Boolean?) {
+        /**
+         * How much this looks like a real tile: one that says whether it's on (or is a
+         * switch) beats a status bar icon or a header button with the same name.
+         */
+        val tileness: Int
+            get() {
+                val id = node.viewIdResourceName.orEmpty().lowercase()
+                var score = if (state != null || node.isCheckable) 15 else 0
+                if (listOf("status", "icon", "clock", "battery", "header", "carrier").any { it in id }) score -= 25
+                return score
+            }
+    }
 
     // --- The tapping (on the worker thread) --------------------------------------------------
 
@@ -135,15 +152,16 @@ object QuickTiles {
 
         // Find the tile, paging through Quick Settings if it isn't on the first page.
         val seen = LinkedHashSet<String>()
-        var tile: Tile? = null
+        var matches: List<Tile> = emptyList()
         for (page in 0 until 6) {
-            tile = waitFor(if (page == 0) 1500 else 700) {
+            matches = waitFor(if (page == 0) 1500 else 700) {
                 val tiles = tiles(svc)
-                tiles.forEach { seen += QuickTileNames.display(it.label) }
-                QuickTileNames.best(tiles.map { it.label }, names)?.let { tiles[it] }
-            }
-            if (tile != null || !nextPage(svc)) break
+                tiles.forEach { if (it.tileness > 0) seen += QuickTileNames.display(it.label) }
+                QuickTileNames.ranked(tiles.map { it.label }, names) { tiles[it].tileness }.map { tiles[it] }.ifEmpty { null }
+            }.orEmpty()
+            if (matches.isNotEmpty() || !nextPage(svc)) break
         }
+        val tile = matches.firstOrNull()
         if (tile == null) {
             close(svc)
             return Outcome.NotFound(seen.filter { it.isNotBlank() })
@@ -156,7 +174,8 @@ object QuickTiles {
             return Outcome.Done("$name is already ${word(want)}.")
         }
         val switchesBefore = switches(svc).map { it.second }.toSet()
-        if (!tile.node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+        // Tap the best match; if Android refuses, the next one that looks like the same tile.
+        if (matches.filter { it.tileness >= tile.tileness - 10 }.take(3).none { tap(svc, it.node) }) {
             close(svc)
             return Outcome.Failed("Android didn't let me tap $name.")
         }
@@ -165,7 +184,9 @@ object QuickTiles {
         val deadline = System.currentTimeMillis() + 2500
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(150)
-            val now = tiles(svc).firstOrNull { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
+            val now = tiles(svc)
+                .filter { QuickTileNames.normalize(QuickTileNames.display(it.label)) == QuickTileNames.normalize(name) }
+                .maxByOrNull { it.tileness }
             val after = now?.state
             if (before != null && after != null && after != before) {
                 close(svc)
@@ -201,7 +222,7 @@ object QuickTiles {
         val (node, label) = dialog[index]
         val isOn = node.isChecked
         val target = want ?: !isOn
-        if (isOn != target) node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        if (isOn != target) tap(svc, node)
         Thread.sleep(400)
         // Close the dialog with its Done button, or Back, then the shade.
         val doneButton = nodes(svc).firstOrNull { it.isClickable && it.text?.toString()?.trim().equals("Done", ignoreCase = true) }
@@ -210,6 +231,31 @@ object QuickTiles {
         close(svc)
         val shown = QuickTileNames.display(label).ifBlank { tileName }
         return Outcome.Done(if (isOn == target) "$shown is already ${word(target)}." else "$shown ${word(target)}.")
+    }
+
+    /**
+     * Taps [node]: its click action, else its nearest clickable parent's, else a real touch in
+     * the middle of it (some tiles' parts don't take the click action).
+     */
+    private fun tap(svc: AccessibilityService, node: AccessibilityNodeInfo): Boolean {
+        if (node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+        var parent = node.parent
+        var depth = 0
+        while (parent != null && depth++ < 3) {
+            if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            parent = parent.parent
+        }
+        val bounds = Rect().also(node::getBoundsInScreen)
+        if (bounds.isEmpty) return false
+        val path = Path().apply { moveTo(bounds.exactCenterX(), bounds.exactCenterY()) }
+        val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 60)).build()
+        val finished = CountDownLatch(1)
+        var ok = false
+        val sent = svc.dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) { ok = true; finished.countDown() }
+            override fun onCancelled(gestureDescription: GestureDescription?) { finished.countDown() }
+        }, main)
+        return sent && finished.await(1, TimeUnit.SECONDS) && ok
     }
 
     private fun word(on: Boolean) = if (on) "on" else "off"

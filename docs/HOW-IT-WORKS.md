@@ -187,7 +187,10 @@ service) gets around that the way a person would. With it on, those switches and
 `quick_setting` tool (any tile by name) are done by `tools/QuickTiles.kt`. It opens Quick
 Settings, finds the tile by its label (`engine/QuickTileNames.kt` matches names and reads
 "On"/"Off"), pages through if needed, taps it only if that changes anything, checks the
-result and closes the shade. A tile that opens a dialog (Internet, Bluetooth) has the right
+result and closes the shade. Real tiles (which say whether they're on) are preferred over
+status bar icons with the same name, such as the Wi-Fi and Bluetooth icons at the top of the
+shade. A tap that Android refuses is retried on the tile's parent, then as a real touch on
+the screen. A tile that opens a dialog (Internet, Bluetooth) has the right
 switch in the dialog used instead. This watches the screen for a second or two, so it runs on
 its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
 several commands in one sentence wait for each other. If no tile matches, a switch falls back

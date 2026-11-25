@@ -92,20 +92,24 @@ object QuickTileNames {
     }
 
     /** The best of [labels] for any of [names] (earlier names win ties), or null. */
-    fun best(labels: List<String>, names: List<String>): Int? {
-        var bestIndex: Int? = null
-        var bestScore = 0
+    fun best(labels: List<String>, names: List<String>): Int? = ranked(labels, names).firstOrNull()
+
+    /**
+     * Every label that matches one of [names], best first. [bonus] adds to a label's score:
+     * the caller uses it to prefer real tiles (which say whether they're on) over status bar
+     * icons with the same name ("Wi-Fi, signal full" is an exact match for "Wi-Fi", but it's
+     * an icon, and can't be tapped).
+     */
+    fun ranked(labels: List<String>, names: List<String>, bonus: (Int) -> Int = { 0 }): List<Int> {
+        val scores = IntArray(labels.size)
         names.forEachIndexed { rank, name ->
             labels.forEachIndexed { i, label ->
+                val match = score(label, name)
                 // An earlier name is the likelier one, so it gets a small edge.
-                val s = score(label, name) * 10 - rank
-                if (score(label, name) > 0 && s > bestScore) {
-                    bestScore = s
-                    bestIndex = i
-                }
+                if (match > 0) scores[i] = maxOf(scores[i], match * 10 - rank)
             }
         }
-        return bestIndex
+        return labels.indices.filter { scores[it] > 0 }.sortedByDescending { scores[it] + bonus(it) }
     }
 
     /** "On"/"Off" in a tile's description or state text; null when it doesn't say. */
