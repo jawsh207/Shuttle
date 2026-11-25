@@ -21,7 +21,6 @@ import app.shuttle.assistant.llm.GranitePrompt
 import app.shuttle.assistant.llm.LocalModel
 import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.llm.ModelPrompts
-import app.shuttle.assistant.llm.PersonalityPrefs
 import app.shuttle.assistant.search.SearchResult
 import app.shuttle.assistant.search.SearchResults
 import app.shuttle.assistant.search.WebSearch
@@ -251,7 +250,7 @@ class AssistantViewModel : ViewModel() {
         sources: List<Source>,
         after: (Boolean) -> Unit,
     ) {
-        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note(personality = PersonalityPrefs.get(context)))
+        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note())
         LocalModel.generate(model.file, prompt) { event ->
             when (event) {
                 is LocalModel.Event.Status -> replace(placeholderId) { it.copy(status = if (round > 0) "Reading the results…" else event.text) }

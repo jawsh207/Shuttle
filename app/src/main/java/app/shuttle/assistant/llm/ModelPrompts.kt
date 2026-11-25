@@ -119,13 +119,9 @@ object ModelPrompts {
             "You don't know exactly when your training data ends, so never state a cutoff date or year; " +
             "if asked, say you can't tell exactly and that recent events may be missing."
 
-    /**
-     * The date and the chosen [Personality], sent after the shared start so the start never
-     * changes (and so switching personality costs nothing).
-     */
-    fun note(today: LocalDate = LocalDate.now(), personality: Personality = Personality.BALANCED): String =
-        "Today is " + today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)) + "." +
-            if (personality.instruction.isEmpty()) "" else " Personality: " + personality.instruction
+    /** The date, sent after the shared start so the start never changes. */
+    fun note(today: LocalDate = LocalDate.now()): String =
+        "Today is " + today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)) + "."
 
     /** The prompt start every request shares, for [LocalModel.prepare]. */
     fun prefix(): String = GranitePrompt.systemBlock(system(), tools)

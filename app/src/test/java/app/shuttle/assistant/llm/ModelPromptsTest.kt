@@ -38,12 +38,6 @@ class ModelPromptsTest {
 
     @Test fun promptStartIsStableAndDatedOnly() {
         assertEquals("Today is Tuesday, November 24, 2026.", ModelPrompts.note(LocalDate.of(2026, 11, 24)))
-        assertEquals(
-            "Today is Tuesday, November 24, 2026. Personality: " + Personality.BRIEF.instruction,
-            ModelPrompts.note(LocalDate.of(2026, 11, 24), Personality.BRIEF),
-        )
-        assertEquals(Personality.BALANCED, Personality.from("NOT_A_PERSONALITY"))
-        assertEquals(Personality.WITTY, Personality.from("WITTY"))
         assertTrue(!ModelPrompts.prefix().contains("Today is"))
         val full = GranitePrompt.build(
             ModelPrompts.system(), ModelPrompts.tools, listOf(GranitePrompt.Message(GranitePrompt.Role.USER, "hi")),

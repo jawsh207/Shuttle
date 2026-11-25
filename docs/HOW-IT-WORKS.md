@@ -134,7 +134,7 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   recipes, advice), starting with the answer and matching its length to the question, light
   Markdown for lists and key terms, using the phone's tools only when asked to do something on
   the phone, searching the web for anything current, and never naming a knowledge cutoff year
-  (it can't know it). The chosen personality (Settings › Personality: Balanced, Brief, Friendly, Professional, Witty, Teacher, Sassy, Sarcastic, Rude, Comedian, Grumpy, Dramatic, Pirate; the attitude changes, never the answer) goes in the short note sent with each question, next to the date, not in the instructions, so switching costs nothing; it only changes the model's own answers. It's told to treat the user as an adult and answer sensitive subjects (health, drugs, law, security, mature themes) frankly and specifically, without lecturing, and to decline only requests that would seriously help someone hurt people. Earlier turns of the chat go along as context: a window of up to roughly
+  (it can't know it). It's told to treat the user as an adult and answer sensitive subjects (health, drugs, law, security, mature themes) frankly and specifically, without lecturing, and to decline only requests that would seriously help someone hurt people. Earlier turns of the chat go along as context: a window of up to roughly
   3,000 tokens whose start stays put; when it outgrows that, the oldest turns are dropped until
   it's down to half. Dropping one turn per question would change the start of every prompt and
   make the model re-read the whole chat each time. The model
@@ -257,7 +257,6 @@ timers are created in your own clock app, which rings them.
 | `ui/ChatScreen.kt` | Full-screen chat: search bar, saved-chat list, new chat, settings gear, greeting and suggestions |
 | `search/WebSearch.kt` | Web search: DuckDuckGo's HTML results, then Wikipedia |
 | `search/SearchResults.kt` | Reading DuckDuckGo's results page; results written out for the model |
-| `llm/Personality.kt`, `llm/PersonalityPrefs.kt` | The answer styles in Settings › Personality, and where the choice is kept |
 | `llm/LlamaEngine.kt` | Kotlin side of the native bridge to llama.cpp |
 | `llm/LocalModel.kt` | Loads the model when needed, streams replies, unloads when idle |
 | `llm/ModelManager.kt` | The model's state: download, check, install, update, delete |
