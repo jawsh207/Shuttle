@@ -95,10 +95,23 @@ object QuickTiles {
                         is Outcome.Done -> ToolResult.Done(outcome.text)
                         is Outcome.Failed -> ToolResult.Failed(outcome.text)
                         // A switch still has its panel or settings page to fall back on.
-                        is Outcome.NotFound -> if (call.name != "quick_setting") DeviceTools.run(context, call) else notFound(call, outcome.seen)
+                        is Outcome.NotFound -> if (call.name != "quick_setting") fallback(context, call, outcome.seen) else notFound(call, outcome.seen)
                     },
                 )
             }
+        }
+    }
+
+    /** No tile for a switch: its usual panel or settings page, saying why, and what was there. */
+    private fun fallback(context: Context, call: ToolCall, seen: List<String>): ToolResult {
+        val result = DeviceTools.run(context, call)
+        val name = QuickTileNames.forSwitch.getValue(call.name).first()
+        val tiles = seen.take(12).joinToString(", ")
+        val why = "I couldn't find a $name tile in Quick Settings" + (if (tiles.isNotEmpty()) " (I found: $tiles)" else "") + ". "
+        return when (result) {
+            is ToolResult.Done -> result.copy(text = why + result.text)
+            is ToolResult.Failed -> result.copy(text = why + result.text)
+            else -> result
         }
     }
 
@@ -248,14 +261,7 @@ object QuickTiles {
         val bounds = Rect().also(node::getBoundsInScreen)
         if (bounds.isEmpty) return false
         val path = Path().apply { moveTo(bounds.exactCenterX(), bounds.exactCenterY()) }
-        val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 60)).build()
-        val finished = CountDownLatch(1)
-        var ok = false
-        val sent = svc.dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
-            override fun onCompleted(gestureDescription: GestureDescription?) { ok = true; finished.countDown() }
-            override fun onCancelled(gestureDescription: GestureDescription?) { finished.countDown() }
-        }, main)
-        return sent && finished.await(1, TimeUnit.SECONDS) && ok
+        return gesture(svc, GestureDescription.StrokeDescription(path, 0, 60))
     }
 
     private fun word(on: Boolean) = if (on) "on" else "off"
@@ -317,16 +323,63 @@ object QuickTiles {
             n to (if (own.isNotBlank()) own else n.parent?.let(::labelOf).orEmpty())
         }
 
-    /** Swipes Quick Settings to its next page of tiles. False when there isn't one. */
+    /** The labels of the tiles on screen now, to tell whether a page turn worked. */
+    private fun visibleTiles(svc: AccessibilityService): Set<String> =
+        tiles(svc).filter { it.tileness > 0 }.map { QuickTileNames.display(it.label) }.toSet()
+
+    /**
+     * Turns Quick Settings to its next page of tiles. False when there isn't one. The pager is
+     * the scrollable element holding the most tiles (not the notification list), asked to page
+     * right or scroll on; if that changes nothing, a swipe across the tiles, then one upwards
+     * for a grid that scrolls instead of paging.
+     */
     private fun nextPage(svc: AccessibilityService): Boolean {
-        val scrollable = nodes(svc).filter { n ->
-            n.isScrollable && n.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD }
+        val before = visibleTiles(svc)
+        if (before.isEmpty()) return false
+        val tileCenters = tiles(svc).filter { it.tileness > 0 }.map { t ->
+            Rect().also(t.node::getBoundsInScreen).let { it.centerX() to it.centerY() }
         }
-        // The tile pager, not the notification list below it.
-        val pager = scrollable.firstOrNull { n ->
-            n.className?.contains("Pager") == true || n.viewIdResourceName?.let { "qs" in it || "pager" in it } == true
-        } ?: scrollable.firstOrNull { n -> n.viewIdResourceName?.contains("notification") != true } ?: return false
-        return pager.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+        val pageRight = AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_RIGHT.id
+        val scrollRight = AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_RIGHT.id
+        val forward = AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+        val pager = nodes(svc)
+            .filter { n -> n.actionList.any { it.id == pageRight || it.id == scrollRight || it.id == forward } }
+            .map { n -> n to Rect().also(n::getBoundsInScreen).let { r -> tileCenters.count { (x, y) -> r.contains(x, y) } } }
+            .filter { it.second > 0 }
+            .maxByOrNull { it.second }?.first
+        fun turned(): Boolean {
+            Thread.sleep(450)
+            val now = visibleTiles(svc)
+            return now.isNotEmpty() && now != before
+        }
+        if (pager != null) {
+            val action = listOf(pageRight, scrollRight, forward).first { id -> pager.actionList.any { it.id == id } }
+            if (pager.performAction(action) && turned()) return true
+        }
+        // Swipe across the tiles' area, right to left, then bottom to top.
+        val area = Rect()
+        tiles(svc).filter { it.tileness > 0 }.forEach { t -> area.union(Rect().also(t.node::getBoundsInScreen)) }
+        if (area.isEmpty) return false
+        val y = area.exactCenterY()
+        if (swipe(svc, area.left + area.width() * 0.85f, y, area.left + area.width() * 0.15f, y) && turned()) return true
+        val x = area.exactCenterX()
+        return swipe(svc, x, area.top + area.height() * 0.85f, x, area.top + area.height() * 0.2f) && turned()
+    }
+
+    private fun swipe(svc: AccessibilityService, x1: Float, y1: Float, x2: Float, y2: Float): Boolean {
+        val path = Path().apply { moveTo(x1, y1); lineTo(x2, y2) }
+        return gesture(svc, GestureDescription.StrokeDescription(path, 0, 250))
+    }
+
+    /** Performs [stroke] and waits for it; false if Android cancelled it. */
+    private fun gesture(svc: AccessibilityService, stroke: GestureDescription.StrokeDescription): Boolean {
+        val finished = CountDownLatch(1)
+        var ok = false
+        val sent = svc.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) { ok = true; finished.countDown() }
+            override fun onCancelled(gestureDescription: GestureDescription?) { finished.countDown() }
+        }, main)
+        return sent && finished.await(1, TimeUnit.SECONDS) && ok
     }
 
     private fun close(svc: AccessibilityService) {

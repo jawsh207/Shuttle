@@ -18,7 +18,7 @@ object QuickTileNames {
     val forSwitch: Map<String, List<String>> = mapOf(
         "wifi" to listOf("Wi-Fi", "Wifi", "Internet"),
         "bluetooth" to listOf("Bluetooth"),
-        "mobile_data" to listOf("Mobile data", "Cellular data", "Internet"),
+        "mobile_data" to listOf("Mobile data", "Cellular data", "Mobile network", "Cellular", "Internet"),
         "nfc" to listOf("NFC"),
         "airplane_mode" to listOf("Airplane mode", "Flight mode", "Aeroplane mode"),
         "location" to listOf("Location"),

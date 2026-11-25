@@ -190,7 +190,9 @@ Settings, finds the tile by its label (`engine/QuickTileNames.kt` matches names 
 result and closes the shade. Real tiles (which say whether they're on) are preferred over
 status bar icons with the same name, such as the Wi-Fi and Bluetooth icons at the top of the
 shade. A tap that Android refuses is retried on the tile's parent, then as a real touch on
-the screen. A tile that opens a dialog (Internet, Bluetooth) has the right
+the screen. To reach later pages it pages the element holding the most tiles (not the
+notification list), and if the tiles shown don't change, swipes across them instead. When a
+switch's tile isn't found, its fallback panel says so and lists the tiles that were found. A tile that opens a dialog (Internet, Bluetooth) has the right
 switch in the dialog used instead. This watches the screen for a second or two, so it runs on
 its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
 several commands in one sentence wait for each other. If no tile matches, a switch falls back
