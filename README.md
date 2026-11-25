@@ -102,7 +102,7 @@ limit, and nothing you ask leaves the phone, except the words of a web search (b
   build used (Q4_0) is one llama.cpp runs especially fast on phone CPUs. Replies stream in as
   they're written, and **Stop** works at any point.
 - **Personality:** Settings › Personality picks how it talks: Balanced (default), Brief, Friendly,
-  Professional, Witty, Teacher or Sassy. Phone commands reply the same either way.
+  Professional, Witty, Teacher, Sassy, Sarcastic, Rude, Comedian, Grumpy, Dramatic or Pirate. Phone commands reply the same either way.
 - **Answers:** short and to the point, with lists, bold and code shown as formatting (and read
   aloud without the markup).
 - **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
