@@ -3,6 +3,7 @@ package app.shuttle.assistant.ui
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.text.format.DateFormat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.engine.CONFIRMED
 import app.shuttle.assistant.engine.CommandParser
+import app.shuttle.assistant.engine.InstantAnswers
 import app.shuttle.assistant.engine.SmallTalk
 import app.shuttle.assistant.engine.Source
 import app.shuttle.assistant.engine.ToolCall
@@ -24,6 +26,7 @@ import app.shuttle.assistant.search.SearchResults
 import app.shuttle.assistant.search.WebSearch
 import app.shuttle.assistant.tools.DeviceTools
 import app.shuttle.assistant.tools.QuickTiles
+import java.time.ZonedDateTime
 import java.util.concurrent.Executors
 
 /**
@@ -168,6 +171,12 @@ class AssistantViewModel : ViewModel() {
         }
         if (calls.isNotEmpty()) {
             return runCalls(context, calls, asked, after)
+        }
+        // Sums, conversions and the time elsewhere: answered on the spot, even mid-chat.
+        InstantAnswers.answer(asked, ZonedDateTime.now(), DateFormat.is24HourFormat(context))?.let { answer ->
+            exchanges += Exchange(nextId++, asked, ToolResult.Done(answer))
+            persist()
+            return after(false)
         }
         if (!inModelChat) SmallTalk.reply(asked)?.let { chat ->
             exchanges += Exchange(nextId++, asked, ToolResult.Done(chat.text, closePanel = chat.close))
@@ -420,6 +429,15 @@ class AssistantViewModel : ViewModel() {
                     replace(placeholder.id) { it.copy(result = result, thinking = false) }
                     step(i + 1)
                 }
+            } else if (call.name in DeviceTools.async) {
+                // Tools that wait on the network (the weather): same card-then-fill.
+                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = DeviceTools.asyncStatus(call))
+                exchanges += placeholder
+                DeviceTools.async.getValue(call.name)(context, call) { result ->
+                    replace(placeholder.id) { it.copy(result = result, thinking = false) }
+                    if ((result as? ToolResult.Done)?.closePanel == true) close = true
+                    step(i + 1)
+                }
             } else {
                 val result = DeviceTools.run(context, call)
                 exchanges += Exchange(nextId++, askedHere, result)
@@ -458,7 +476,7 @@ class AssistantViewModel : ViewModel() {
 
     /** A follow-up result for the same request, so no new "asked" bubble. */
     private fun rerun(context: Context, call: ToolCall): Boolean {
-        if (QuickTiles.handles(call)) {
+        if (QuickTiles.handles(call) || call.name in DeviceTools.async) {
             runCalls(context, listOf(call), "") {}
             return false
         }

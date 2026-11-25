@@ -217,7 +217,7 @@ class CommandParserTest {
         check("text my sister saying call me", call("send_sms", "contact" to "sister", "message" to "call me"))
         check("message Alex to say thanks", call("send_sms", "contact" to "Alex", "message" to "thanks"))
         check("text Sam saying I'm leaving now", call("send_sms", "contact" to "Sam", "message" to "I'm leaving now"))
-        check("reply to Jo saying sounds good", call("send_sms", "contact" to "Jo", "message" to "sounds good"))
+        check("reply to Jo saying sounds good", call("reply_message", "contact" to "Jo", "message" to "sounds good"))
         check("send Dad a text", call("send_sms", "contact" to "Dad", "message" to ""))
         check("text my mom I'll call you back", call("send_sms", "text" to "mom I'll call you back"))
     }
@@ -225,7 +225,7 @@ class CommandParserTest {
     @Test fun moreWaysForAppsPlacesAndStatus() {
         check("pull up the calculator", call("open_app", "name" to "calculator"))
         check("take me to the camera app", call("open_app", "name" to "camera"))
-        check("go to the settings app", call("open_app", "name" to "settings"))
+        check("go to the settings app", call("open_settings", "page" to "settings"))
         check("take me home", call("navigate", "destination" to "home"))
         check("where's the nearest gas station", call("navigate", "destination" to "the nearest gas station"))
         check("coffee shops near me", call("navigate", "destination" to "coffee shops near me"))
@@ -303,6 +303,88 @@ class CommandParserTest {
         check("turn on dark mode", call("dark_mode", "state" to "on"))
     }
 
+    @Test fun reminders() {
+        check("remind me to call Mom at 6", call("set_reminder", "text" to "call Mom", "when" to "at 6"))
+        check("remind me to take out the trash tomorrow at 8", call("set_reminder", "text" to "take out the trash", "when" to "tomorrow at 8"))
+        check("remind me in 20 minutes to check the oven", call("set_reminder", "text" to "check the oven", "when" to "in 20 minutes"))
+        check("remind me tomorrow to go to the store", call("set_reminder", "text" to "go to the store", "when" to "tomorrow"))
+        check("set a reminder for friday at 3 to pay rent", call("set_reminder", "text" to "pay rent", "when" to "friday at 3"))
+        check("remind me in 5 minutes", call("set_timer", "seconds" to "300"))
+    }
+
+    @Test fun calendar() {
+        check("what's on my calendar today", call("calendar_events", "day" to "today"))
+        check("what do I have tomorrow", call("calendar_events", "day" to "tomorrow"))
+        check("what's on friday", call("calendar_events", "day" to "friday"))
+        check("check my schedule for this week", call("calendar_events", "day" to "week"))
+        check("am I free next monday", call("calendar_events", "day" to "next monday"))
+        check("my agenda", call("calendar_events", "day" to "today"))
+        check("add dentist to my calendar friday at 3", call("add_event", "title" to "dentist", "when" to "friday at 3"))
+        check("schedule lunch with Sam tomorrow at noon", call("add_event", "title" to "lunch with Sam", "when" to "tomorrow at noon"))
+        check("create an event called Book club on Thursday at 7", call("add_event", "title" to "Book club", "when" to "on Thursday at 7"))
+        check("what's on", call("status", "setting" to "all"))
+    }
+
+    @Test fun notifications() {
+        check("read my notifications", call("read_notifications"))
+        check("any new messages", call("read_notifications"))
+        check("read my messages from Sam", call("read_notifications", "from" to "Sam"))
+        check("what did Sam say", call("read_notifications", "from" to "Sam"))
+        check("do I have any texts", call("read_notifications"))
+        check("reply to Sam saying On my way!", call("reply_message", "contact" to "Sam", "message" to "On my way!"))
+        check("reply saying sounds good", call("reply_message", "message" to "sounds good"))
+        check("reply to her that I'll be there", call("reply_message", "message" to "I'll be there"))
+    }
+
+    @Test fun phoneActions() {
+        fun action(a: String) = call("phone_action", "action" to a)
+        check("take a screenshot", action("screenshot"))
+        check("screenshot", action("screenshot"))
+        check("lock the phone", action("lock"))
+        check("go to the home screen", action("home"))
+        check("press back", action("back"))
+        check("show recent apps", action("recents"))
+        check("open the notification shade", action("notifications"))
+        check("open quick settings", action("quick_settings"))
+        check("restart my phone", action("power_menu"))
+        check("split screen", action("split_screen"))
+        check("go back", call("media", "action" to "previous"))
+    }
+
+    @Test fun weather() {
+        check("what's the weather", call("weather", "day" to "today"))
+        check("what's the weather like tomorrow", call("weather", "day" to "tomorrow"))
+        check("weather in Paris", call("weather", "place" to "Paris", "day" to "today"))
+        check("what's the forecast for Boston this week", call("weather", "place" to "Boston", "day" to "week"))
+        check("is it going to rain tomorrow", call("weather", "day" to "tomorrow"))
+        check("do I need an umbrella", call("weather", "day" to "today"))
+        check("how cold is it outside", call("weather", "day" to "today"))
+        check("weather on friday", call("weather", "day" to "friday"))
+    }
+
+    @Test fun settingsPages() {
+        check("open battery settings", call("open_settings", "page" to "battery"))
+        check("take me to bluetooth settings", call("open_settings", "page" to "bluetooth"))
+        check("wifi settings", call("open_settings", "page" to "wifi"))
+        check("open settings", call("open_settings", "page" to "settings"))
+        check("app info for Signal", call("open_settings", "app" to "Signal"))
+        check("open developer options", call("open_settings", "page" to "developer"))
+    }
+
+    @Test fun cameraContactsEmailNotes() {
+        check("take a selfie", call("camera", "mode" to "selfie"))
+        check("take a picture", call("camera", "mode" to "photo"))
+        check("record a video", call("camera", "mode" to "video"))
+        check("what's Sam's number", call("contact_info", "contact" to "Sam", "field" to "phone"))
+        check("look up mom's email", call("contact_info", "contact" to "mom", "field" to "email"))
+        check("when is Alex's birthday", call("contact_info", "contact" to "Alex", "field" to "birthday"))
+        check("email Sam about Dinner saying See you at 7", call("send_email", "contact" to "Sam", "subject" to "Dinner", "message" to "See you at 7"))
+        check("email jo@example.com", call("send_email", "contact" to "jo@example.com"))
+        check("add milk to my shopping list", call("add_note", "text" to "Shopping list: milk"))
+        check("take a note that the WiFi password is Hunter2", call("add_note", "text" to "the WiFi password is Hunter2"))
+        check("note to self: buy stamps", call("add_note", "text" to "buy stamps"))
+    }
+
     @Test fun severalCommandsAtOnce() {
         assertEquals(
             listOf(call("wifi", "state" to "off"), call("bluetooth", "state" to "off")),
@@ -330,7 +412,6 @@ class CommandParserTest {
     }
 
     @Test fun leavesOpenQuestionsForTheModel() {
-        check("what's the weather like in Boston", null)
         check("tell me a joke", null)
         check("who won the game last night", null)
         check("call me later", null)

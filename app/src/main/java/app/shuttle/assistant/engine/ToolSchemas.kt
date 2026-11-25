@@ -11,6 +11,9 @@ package app.shuttle.assistant.engine
  */
 object ToolSchemas {
 
+    /** What phone_action can do (all through the accessibility service). */
+    val PHONE_ACTIONS = listOf("screenshot", "lock", "home", "back", "recents", "notifications", "quick_settings", "power_menu", "split_screen")
+
     /** Settings the status tool can report on. */
     val STATUS_SETTINGS = listOf(
         "wifi", "bluetooth", "mobile_data", "nfc", "airplane_mode", "location", "hotspot", "dark_mode",
@@ -90,8 +93,78 @@ object ToolSchemas {
         ToolSpec(
             "quick_setting",
             "Turn a Quick Settings tile on or off, or tap it, by the name shown on it (battery saver, night light, " +
-                "extra dim, data saver, screen record and so on). Needs Quick Settings control turned on.",
+                "extra dim, data saver, screen record and so on). Needs phone control turned on.",
             listOf(Param("name", ParamType.STRING, "The tile's name."), StateParam),
+        ),
+        ToolSpec(
+            "set_reminder", "Remind the user of something at a time, with a notification.",
+            listOf(
+                Param("text", ParamType.STRING, "What to remind them of."),
+                Param("when", ParamType.STRING, "When, as said: in 20 minutes, at 6pm, tomorrow at 9."),
+            ),
+        ),
+        ToolSpec(
+            "calendar_events", "Tell what's on the calendar for a day, or the coming week.",
+            listOf(Param("day", ParamType.STRING, "Today, tomorrow, a weekday, a date, or week.", required = false)),
+        ),
+        ToolSpec(
+            "add_event", "Add an event to the calendar app; the user saves it there.",
+            listOf(
+                Param("title", ParamType.STRING, "What the event is."),
+                Param("when", ParamType.STRING, "Day and time, as said: Friday at 3, tomorrow.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "read_notifications", "Read out recent notifications and messages, optionally only from one app or person.",
+            listOf(Param("from", ParamType.STRING, "An app or person to read from.", required = false)),
+        ),
+        ToolSpec(
+            "reply_message", "Reply to a message notification, through the app it came from. The user confirms first.",
+            listOf(
+                Param("contact", ParamType.STRING, "Who to reply to; empty for the latest message.", required = false),
+                Param("message", ParamType.STRING, "The reply."),
+            ),
+        ),
+        ToolSpec(
+            "phone_action", "Take a screenshot, lock the phone, or go home, back, to recent apps, the notifications or the power menu.",
+            listOf(Param("action", ParamType.STRING, "Which action.", options = PHONE_ACTIONS)),
+        ),
+        ToolSpec(
+            "weather", "Tell the weather now, for a day, or for the week, here or in a named place.",
+            listOf(
+                Param("place", ParamType.STRING, "A city or place; empty for where the phone is.", required = false),
+                Param("day", ParamType.STRING, "Today, tomorrow, a weekday, a date, or week.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "open_settings", "Open a settings page, or an app's App info page.",
+            listOf(
+                Param("page", ParamType.STRING, "Which page.", required = false, options = SettingsPages.keys),
+                Param("app", ParamType.STRING, "An app, for its App info page.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "camera", "Open the camera to take a photo, a selfie, or a video.",
+            listOf(Param("mode", ParamType.STRING, "What to take.", options = listOf("photo", "selfie", "video"))),
+        ),
+        ToolSpec(
+            "contact_info", "Tell a contact's phone number, email, address or birthday.",
+            listOf(
+                Param("contact", ParamType.STRING, "The contact's name."),
+                Param("field", ParamType.STRING, "What to tell.", required = false, options = listOf("phone", "email", "address", "birthday", "all")),
+            ),
+        ),
+        ToolSpec(
+            "send_email", "Start an email in the email app; the user sends it there.",
+            listOf(
+                Param("contact", ParamType.STRING, "A contact name or email address."),
+                Param("subject", ParamType.STRING, "The subject.", required = false),
+                Param("message", ParamType.STRING, "The body.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "add_note", "Save a note or list item in the notes app.",
+            listOf(Param("text", ParamType.STRING, "The note.")),
         ),
         ToolSpec("battery_status", "Report the battery level and whether the phone is charging."),
         ToolSpec(

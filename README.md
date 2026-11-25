@@ -45,6 +45,16 @@ nothing is sent anywhere.
 | Media | "play", "pause the music", "next track", "volume up", "set volume to 30" |
 | Calls and texts | "call Mom", "dial 555 123 4567", "text Sam saying I'm running late" |
 | Clock | "set an alarm for 7:30", "wake me up at quarter to 7", "timer 10 minutes", "remind me in 5 minutes" |
+| Reminders | "remind me to call Mom at 6", "remind me tomorrow to take out the trash", "remind me in 20 minutes to check the oven" |
+| Calendar | "what's on my calendar today?", "what do I have Friday?", "am I free next Monday?", "add dentist to my calendar Friday at 3" |
+| Messages | "read my notifications", "any new messages?", "what did Sam say?", "reply to Sam saying on my way" |
+| Weather | "what's the weather?", "weather in Paris tomorrow", "is it going to rain?", "forecast this week" |
+| Phone | "take a screenshot", "lock the phone", "go to the home screen", "show recent apps", "power menu" |
+| Settings | "open battery settings", "Bluetooth settings", "app info for Signal" |
+| Camera | "take a picture", "take a selfie", "record a video" |
+| Contacts and email | "what's Sam's number?", "when is Alex's birthday?", "email Sam about dinner saying see you at 7" |
+| Notes | "add milk to my shopping list", "take a note that the code is 4512", "note to self: buy stamps" |
+| Quick answers | "what's 15% of 80?", "5 miles in km", "how many cups in a litre?", "what time is it in Tokyo?" |
 | Apps and places | "open camera", "navigate to the library" |
 | Status | "battery", "what time is it", "what's the date" |
 | Is it on? | "is Wi-Fi on?", "am I on silent?", "is the flashlight still on?", "what's the volume at?", "what's on?" |
@@ -139,10 +149,10 @@ Shuttle uses only what a normal app may do, so some switches need one tap from y
 - **Asks to confirm:** Bluetooth on (the system "allow Shuttle to turn on Bluetooth?" prompt).
 - **Opens the settings page:** Bluetooth off, airplane mode, location, hotspot, dark theme.
 
-### Quick Settings control (optional)
+### Phone control (optional)
 
-Turn on **Quick Settings control** (Settings › Special access › Open takes you to Android's
-Accessibility page; it's listed there as *Shuttle Quick Settings control*, sometimes under
+Turn on **Phone control** (Settings › Special access › Open takes you to Android's
+Accessibility page; it's listed there as *Shuttle phone control*, sometimes under
 **Downloaded apps**) and Shuttle switches these itself, the way you would: it opens Quick
 Settings, taps the tile (paging through if it's not on the first page), checks that it changed
 and closes the shade again. That covers Wi-Fi, mobile data, NFC, Bluetooth, airplane mode,
@@ -164,6 +174,31 @@ tile").
   or settings page.
 - **A tile that isn't there** (not added to Quick Settings) can't be tapped; Shuttle lists the
   tiles it found.
+- **Phone actions** use the same service: screenshots, locking the phone, home, back, recent
+  apps, the notification shade, Quick Settings, the power menu and split screen. The panel
+  closes first, so a screenshot shows the app underneath. Restarting or turning off is left to
+  you in the power menu.
+
+### Notification access (optional)
+
+Reading notifications and replying to messages needs **Notification access** (Settings ›
+Special access › Open). Shuttle reads what's in your notifications only when you ask, and
+keeps nothing. Replies go through the message's own Reply button, so the app it came from
+sends them, after you confirm. With access off (or no message to reply to), "reply to Sam
+saying…" sends a text instead. As with phone control, Android may first ask you to **Allow
+restricted settings** in Shuttle's App info.
+
+### Weather, reminders and the calendar
+
+- **Weather** comes from [Open-Meteo](https://open-meteo.com): free, no key, no account. A
+  named place is looked up there; otherwise Shuttle asks once for approximate location and
+  sends only rounded coordinates. Like web search, it needs the Network permission on
+  GrapheneOS.
+- **Reminders** are Shuttle's own notifications (asked for on Android 13+), on time even if
+  the phone is asleep, and set again after a restart.
+- **Calendar**: reading needs the Calendar permission and covers every calendar shown on the
+  phone (local, DAVx⁵ and so on). Adding an event opens your calendar app's new-event screen,
+  filled in, for you to save; Shuttle never writes to a calendar itself.
 
 ## Permissions
 
@@ -176,13 +211,17 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Phone | Placing a call you confirmed |
 | SMS | Sending a text you confirmed |
 | Nearby devices | Showing the "turn on Bluetooth?" prompt (Android 12+) |
-| Internet (GrapheneOS: the Network permission in App info) | Downloading the model once, checking `models/manifest.json` for model updates, and web searches (only the search words are sent) |
+| Internet (GrapheneOS: the Network permission in App info) | Downloading the model once, checking `models/manifest.json` for model updates, web searches (only the search words are sent) and the weather (only the place, or rounded coordinates) |
 | Wi-Fi and network state (granted at install) | Answering "is Wi-Fi on?" and "is mobile data on?" |
-| Notifications (Android 13+, asked when you tap Download) | Showing the model download's progress |
 | Microphone | Voice input; speech recognisers only accept apps that hold it. The recogniser does the recording |
 | Do Not Disturb access (special) | Do Not Disturb and silent mode |
 | Modify system settings (special) | Brightness and auto-rotate |
-| Quick Settings control (optional accessibility service) | Tapping Quick Settings tiles for switches apps can't change |
+| Phone control (optional accessibility service) | Tapping Quick Settings tiles for switches apps can't change; screenshots, lock, home and other phone actions |
+| Notification access (optional, special) | Reading notifications and replying to messages, when asked |
+| Calendar | "What's on my calendar?" |
+| Approximate location | The weather where you are, when no place is named |
+| Notifications (Android 13+) | Showing reminders (and the model download's progress) |
+| Alarms and reminders (exact alarms, granted at install) | Reminders on time; set again after a restart |
 | Set alarms | Creating alarms and timers in your clock app |
 
 ## Set as your assistant

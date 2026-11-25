@@ -27,7 +27,7 @@ import app.shuttle.assistant.engine.ToolResult
  *   airplane mode, location, hotspot and dark theme: apps can't change these, so Shuttle opens
  *   the right settings page.
  *
- * With Quick Settings control on, the ones apps can't change are tapped in Quick Settings
+ * With phone control on, the ones apps can't change are tapped in Quick Settings
  * instead ([QuickTiles]); these remain the fallback.
  */
 internal object Switches {

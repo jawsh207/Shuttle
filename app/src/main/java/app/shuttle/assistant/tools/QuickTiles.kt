@@ -56,7 +56,7 @@ object QuickTiles {
             if (!c.hasAccess(Access.QUICK_SETTINGS)) {
                 needs(Access.QUICK_SETTINGS, call, "Android only lets an accessibility service tap Quick Settings tiles.")
             } else {
-                ToolResult.Failed("Quick Settings control is on but Android hasn't started it yet. Try again in a moment, or turn it off and on again in Accessibility settings.")
+                ToolResult.Failed("Phone control is on but Android hasn't started it yet. Try again in a moment, or turn it off and on again in Accessibility settings.")
             }
         },
     )
@@ -151,7 +151,7 @@ object QuickTiles {
     // --- The tapping (on the worker thread) --------------------------------------------------
 
     private fun flip(call: ToolCall): Outcome {
-        val svc = QuickTilesService.instance ?: return Outcome.Failed("Quick Settings control isn't running.")
+        val svc = QuickTilesService.instance ?: return Outcome.Failed("Phone control isn't running.")
         val names = if (call.name == "quick_setting") {
             QuickTileNames.candidates(call.arg("name") ?: return Outcome.Failed("Which tile?"))
         } else {

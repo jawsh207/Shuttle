@@ -35,6 +35,24 @@ object ModelPrompts {
         "hotspot", "dark_mode", "do_not_disturb", "auto_rotate", "auto_brightness",
     )
 
+    /**
+     * Shorter versions of a few real tools for the model, to keep what it reads once small:
+     * settings pages are named freely (the tool works out which page), not listed.
+     */
+    private val shorter: Map<String, ToolSpec> = mapOf(
+        "open_settings" to ToolSpec(
+            "open_settings", "Open a settings page (wifi, battery, display, apps, privacy...) or an app's App info.",
+            listOf(
+                Param("page", ParamType.STRING, "Which page.", required = false),
+                Param("app", ParamType.STRING, "An app, for its App info.", required = false),
+            ),
+        ),
+        "quick_setting" to ToolSpec(
+            "quick_setting", "Turn a Quick Settings tile on or off by its name (battery saver, night light, data saver...).",
+            listOf(Param("name", ParamType.STRING, "The tile's name."), StateParam),
+        ),
+    )
+
     /** Short, model-facing tool descriptions. Names other than the two below are real tools. */
     private val specs: List<ToolSpec> = buildList {
         add(
@@ -52,8 +70,10 @@ object ModelPrompts {
         val keep = listOf(
             "ringer_mode", "brightness", "volume", "media", "quick_setting", "call", "set_alarm", "set_timer",
             "open_app", "navigate", "battery_status", "date_time",
+            "weather", "set_reminder", "calendar_events", "add_event", "read_notifications", "reply_message",
+            "phone_action", "open_settings", "camera", "contact_info", "send_email", "add_note",
         )
-        keep.forEach { name -> add(ToolSchemas.find(name)!!) }
+        keep.forEach { name -> add(shorter[name] ?: ToolSchemas.find(name)!!) }
         add(
             ToolSpec(
                 "web_search",

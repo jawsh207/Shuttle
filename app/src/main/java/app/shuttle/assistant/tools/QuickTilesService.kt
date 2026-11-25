@@ -5,7 +5,7 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 
 /**
- * Shuttle's optional accessibility service, "Quick Settings control". Android lets no normal
+ * Shuttle's optional accessibility service, "phone control" (first added for Quick Settings). Android lets no normal
  * app switch Wi-Fi, mobile data, airplane mode, battery saver and the rest, but an
  * accessibility service may open Quick Settings and tap a tile the way a person would, with
  * no root. This class only holds the connection; [QuickTiles] does the opening and tapping.

@@ -16,10 +16,10 @@ object SmallTalk {
     private fun matches(s: String, vararg patterns: String) = patterns.any { Regex(it).matches(s) }
 
     const val HELP =
-        "I can switch things like the flashlight, Do Not Disturb, silent mode and Quick Settings tiles, change brightness " +
-            "and volume, control music, set alarms and timers, call and text your contacts, open apps, " +
-            "give directions, tell you the time or your battery level, check what's switched on, and search the web. " +
-            "Try \"set a timer for 10 minutes\" or \"text Sam saying I'm on my way\"."
+        "I can switch things like Wi-Fi, the flashlight and Quick Settings tiles, set alarms, timers and reminders, " +
+            "read your calendar and messages, check the weather, call, text and email your contacts, open apps and settings, " +
+            "take screenshots, do quick sums and conversions, and search the web. " +
+            "Try \"remind me to call Mom at 6\" or \"what's the weather tomorrow?\""
 
     fun reply(input: String): Reply? {
         val s = input.lowercase().replace('’', '\'').replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()

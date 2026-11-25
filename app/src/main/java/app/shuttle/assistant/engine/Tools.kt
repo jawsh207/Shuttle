@@ -43,9 +43,13 @@ enum class Access(val label: String, val permissions: List<String>) {
     SMS("Send text messages", listOf("android.permission.SEND_SMS")),
     NEARBY_DEVICES("Nearby devices (Bluetooth)", listOf("android.permission.BLUETOOTH_CONNECT")),
     MICROPHONE("Microphone", listOf("android.permission.RECORD_AUDIO")),
+    CALENDAR("Calendar", listOf("android.permission.READ_CALENDAR")),
+    LOCATION("Approximate location", listOf("android.permission.ACCESS_COARSE_LOCATION")),
+    NOTIFY("Notifications", listOf("android.permission.POST_NOTIFICATIONS")),
     DO_NOT_DISTURB("Do Not Disturb access", emptyList()),
     SYSTEM_SETTINGS("Modify system settings", emptyList()),
-    QUICK_SETTINGS("Quick Settings control", emptyList());
+    QUICK_SETTINGS("Phone control", emptyList()),
+    NOTIFICATION_ACCESS("Notification access", emptyList());
 
     val isRuntimePermission: Boolean get() = permissions.isNotEmpty()
 }

@@ -297,9 +297,183 @@ object CommandParser {
     private const val MUSIC = "(?:music|song|track|playback|audio|media|video|podcast|it|this|that)"
     private const val PERCENT = "(\\d{1,3})\\s*(?:%|percent)?"
 
+
+    // --- Reminders, calendar, messages, weather and other assistant tools ---------------------
+
+    private val WHEN = "(?:in|after)\\s+.+|at\\s+.+|on\\s+.+|by\\s+.+|tomorrow.*|tonight.*|today.*|this\\s+(?:morning|afternoon|evening).*|next\\s+.+|" +
+        "(?:mon|tues|wednes|thurs|fri|satur|sun)day.*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\s+\\d.*|noon|midnight"
+
+    /** A reminder, only when [whenText] really is a time ("remind me to call at the office" isn't). */
+    private fun reminder(text: String, whenText: String): ToolCall? {
+        val t = text.trim().trimEnd('.', ',').removePrefix("to ").trim()
+        val w = whenText.trim().trimEnd('.', '?')
+        if (t.isEmpty() || When.parse(w, java.time.LocalDateTime.now()) == null) return null
+        return ToolCall("set_reminder", mapOf("text" to t, "when" to w))
+    }
+
+    /** "today", "tomorrow", "friday", "this week" → the day argument. */
+    private fun dayArg(raw: String?): String {
+        val d = raw.orEmpty().trim().removePrefix("for ").removePrefix("on ").trim()
+        return when {
+            d.isEmpty() || d == "now" || d == "right now" || d == "outside" -> "today"
+            Regex("(?:this|the|next)\\s+week|week|weekend|this weekend|the weekend|next few days|coming days").matches(d) -> "week"
+            else -> d.removePrefix("the ")
+        }
+    }
+
+    private const val DAY_WORDS = "today|tonight|tomorrow|this week|next week|the week|this weekend|the weekend|week|weekend|" +
+        "(?:on\\s+|this\\s+|next\\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)day|right now|now|later|this (?:morning|afternoon|evening)"
+
+    /** "in Paris tomorrow" / "tomorrow in Paris" / "" → weather(place, day). */
+    private fun weatherCall(rest: String): ToolCall? {
+        var r = rest.trim().removeSuffix("outside").trim()
+        var day: String? = null
+        Regex("^(?:for\\s+|on\\s+)?($DAY_WORDS)\\b\\s*(.*)$").find(r)?.let { day = it.groupValues[1]; r = it.groupValues[2] }
+        Regex("^(.*?)\\s*\\b(?:for\\s+|on\\s+)?($DAY_WORDS)$").find(r)?.let { if (day == null) { day = it.groupValues[2]; r = it.groupValues[1] } }
+        r = r.trim()
+        val place = Regex("^(?:in|for|at|near|around)\\s+(.+)$").find(r)?.groupValues?.get(1)?.trim()
+        if (r.isNotEmpty() && place == null && r !in setOf("like", "here", "outside", "today")) return null
+        return ToolCall("weather", buildMap {
+            place?.takeIf { it !in setOf("here", "my area", "my location", "town") }?.let { put("place", it) }
+            put("day", dayArg(day?.let { if (it == "tonight" || it.startsWith("this ") && !it.endsWith("week") && !it.endsWith("weekend")) "today" else it }))
+        })
+    }
+
+    private fun contactInfo(who: String, what: String): ToolCall? {
+        val field = when {
+            Regex("(?:phone\\s+)?(?:number|phone|cell|mobile)").matches(what) -> "phone"
+            Regex("e-?mail(?:\\s+address)?").matches(what) -> "email"
+            Regex("(?:home\\s+)?address").matches(what) -> "address"
+            what == "birthday" -> "birthday"
+            Regex("contact(?:\\s+info(?:rmation)?|\\s+details)?|details|info").matches(what) -> "all"
+            else -> return null
+        }
+        return person(who).takeIf { it.isNotEmpty() }?.let { ToolCall("contact_info", mapOf("contact" to it, "field" to field)) }
+    }
+
+    private fun phoneAction(a: String) = ToolCall("phone_action", mapOf("action" to a))
+
+    private fun assistantRules(): List<Rule> = buildList {
+        // Reminders (before timers: "remind me in 5 minutes to stretch" has a message).
+        val remind = "(?:remind|ping|tell)\\s+me"
+        add(Rule("$remind\\s+(?:to\\s+|about\\s+|that\\s+)(.+?)\\s+($WHEN)", verbatim = true) { reminder(it.groupValues[1], it.groupValues[2]) })
+        // When first: the shortest opening that's really a time ("tomorrow", "at 6", "in an hour").
+        add(Rule("$remind\\s+(.+?)\\s+(?:to|about|that)\\s+(.+)", verbatim = true) { reminder(it.groupValues[2], it.groupValues[1]) })
+        add(Rule("(?:set|create|make|add)\\s+(?:a\\s+)?reminder\\s+(?:to\\s+|for\\s+|about\\s+|that\\s+)?(.+?)\\s+($WHEN)", verbatim = true) { reminder(it.groupValues[1], it.groupValues[2]) })
+        add(Rule("(?:set|create|make|add)\\s+(?:a\\s+)?reminder\\s+(?:for\\s+)?(.+?)\\s+(?:to|about|that|saying)\\s+(.+)", verbatim = true) { reminder(it.groupValues[2], it.groupValues[1]) })
+        add(Rule("reminder\\s*:?\\s+(.+?)\\s+($WHEN)", verbatim = true) { reminder(it.groupValues[1], it.groupValues[2]) })
+
+        // Calendar: adding (before notes, so "add X to my calendar" isn't a note).
+        val cal = "(?:my\\s+|the\\s+)?(?:calendar|schedule|agenda)"
+        add(Rule("(?:add|put|schedule)\\s+(.+?)\\s+(?:to|on|in)\\s+$cal(?:\\s+(?:for\\s+)?(.+))?", verbatim = true) {
+            ToolCall("add_event", buildMap { put("title", it.groupValues[1].trim()); it.groupValues[2].takeIf { w -> w.isNotBlank() }?.let { w -> put("when", w.trim()) } })
+        })
+        add(Rule("(?:add|create|make|schedule|set up|new)\\s+(?:an?\\s+)?(?:event|appointment|meeting)\\s+(?:called\\s+|for\\s+|named\\s+)?(.+?)(?:\\s+($WHEN))?", verbatim = true) {
+            ToolCall("add_event", buildMap { put("title", it.groupValues[1].trim()); it.groupValues[2].takeIf { w -> w.isNotBlank() }?.let { w -> put("when", w.trim()) } })
+        })
+        add(Rule("schedule\\s+(?:an?\\s+)?(.+?)\\s+($WHEN)", verbatim = true) { m ->
+            When.parse(m.groupValues[2], java.time.LocalDateTime.now())?.let { ToolCall("add_event", mapOf("title" to m.groupValues[1].trim(), "when" to m.groupValues[2].trim())) }
+        })
+        // Calendar: reading.
+        val day = "(?:\\s+(?:for\\s+|on\\s+)?(today|tonight|tomorrow|this week|next week|the week|this weekend|(?:next\\s+|this\\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)day|the\\s+\\d{1,2}(?:st|nd|rd|th)?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\s+\\d{1,2}(?:st|nd|rd|th)?))?"
+        fun events(m: MatchResult) = ToolCall("calendar_events", mapOf("day" to dayArg(m.groupValues.drop(1).firstOrNull { it.isNotEmpty() })))
+        add(Rule("what(?:'s| is)\\s+on\\s+$cal$day") { events(it) })
+        add(Rule("what(?:'s| is)\\s+on$day") { m -> if (m.groupValues[1].isEmpty()) null else events(m) })
+        add(Rule("what(?:'s| is| does)\\s+$cal(?:\\s+look\\s+like)?$day") { events(it) })
+        add(Rule("(?:check|show|read|open|show me|what's in|whats on)\\s+$cal$day") { events(it) })
+        add(Rule("what\\s+do\\s+i\\s+have(?:\\s+(?:going\\s+)?on)?(?:\\s+planned)?$day") { events(it) })
+        add(Rule("(?:do\\s+i\\s+have|any|are\\s+there\\s+any)\\s+(?:events|meetings|appointments|plans)$day") { events(it) })
+        add(Rule("am\\s+i\\s+(?:free|busy)$day") { events(it) })
+        add(Rule("(?:my|today's|tomorrow's)\\s+(?:calendar|schedule|agenda)") { m -> events(m).let { c -> if (m.value.startsWith("tomorrow")) c.with("day", "tomorrow") else c } })
+
+        // Notifications and messages.
+        val msgs = "(?:notifications?|messages?|texts?|alerts?)"
+        val from = "(?:\\s+(?:from|on|in)\\s+(.+))?"
+        fun read(m: MatchResult) = ToolCall("read_notifications", buildMap {
+            m.groupValues.drop(1).lastOrNull { it.isNotBlank() }?.let { put("from", person(it)) }
+        })
+        add(Rule("(?:read|check|show|show me|read me|go through|what are)\\s+(?:me\\s+)?(?:my\\s+|the\\s+)?(?:new\\s+|latest\\s+|recent\\s+|unread\\s+)?$msgs$from") { read(it) })
+        add(Rule("(?:any|do\\s+i\\s+have\\s+any|have\\s+i\\s+got\\s+any|did\\s+i\\s+get\\s+any)\\s+(?:new\\s+)?$msgs$from") { read(it) })
+        add(Rule("what\\s+did\\s+i\\s+miss") { read(it) })
+        add(Rule("what\\s+did\\s+(.+?)\\s+(?:say|send|text|write|message)(?:\\s+me)?") { m -> ToolCall("read_notifications", mapOf("from" to person(m.groupValues[1]))) })
+        add(Rule("read\\s+(.+?)'s\\s+(?:messages?|texts?)") { m -> ToolCall("read_notifications", mapOf("from" to person(m.groupValues[1]))) })
+        val say = "(?:saying|with|that|and say|and tell (?:him|her|them))"
+        add(Rule("(?:reply|respond|answer|write back)\\s+(?:to\\s+)?(?:him|her|them|that|it)\\s+(?:$say\\s+)?(.+)", verbatim = true) { m ->
+            ToolCall("reply_message", mapOf("message" to m.groupValues[1].trim()))
+        })
+        add(Rule("(?:reply|respond|answer|write back)\\s+(?:to\\s+)?(.+?)\\s+$say\\s+(.+)", verbatim = true) { m ->
+            ToolCall("reply_message", mapOf("contact" to person(m.groupValues[1]), "message" to m.groupValues[2].trim()))
+        })
+        add(Rule("(?:reply|respond|write back)\\s+(?:$say|:)\\s*(.+)", verbatim = true) { m -> ToolCall("reply_message", mapOf("message" to m.groupValues[1].trim())) })
+
+        // Phone actions (through the accessibility service).
+        add(Rule("(?:take|grab|capture|get|make)\\s+(?:a\\s+)?(?:screenshot|screen\\s*shot|screen\\s+capture)(?:\\s+(?:of\\s+)?(?:this|the\\s+screen|my\\s+screen))?|screenshot(?:\\s+(?:this|that|the\\s+screen))?|screen\\s*shot|capture\\s+(?:the\\s+|my\\s+)?screen") { phoneAction("screenshot") })
+        add(Rule("lock\\s+(?:the\\s+|my\\s+)?(?:phone|screen|device)|lock\\s+it|lock\\s+screen\\s+now|turn\\s+(?:the\\s+)?screen\\s+off|turn\\s+off\\s+(?:the\\s+)?screen|screen\\s+off") { phoneAction("lock") })
+        add(Rule("(?:go|take\\s+me|back)\\s+(?:to\\s+)?(?:the\\s+)?home\\s*screen|(?:show|open)\\s+(?:the\\s+)?home\\s*screen|home\\s*screen|go\\s+to\\s+home") { phoneAction("home") })
+        add(Rule("(?:press|hit|tap)\\s+(?:the\\s+)?back(?:\\s+button)?|back\\s+button|go\\s+back\\s+a\\s+screen|previous\\s+screen") { phoneAction("back") })
+        add(Rule("(?:show|open|go\\s+to)\\s+(?:my\\s+|the\\s+)?(?:recent\\s+apps|recents|app\\s+switcher|overview|open\\s+apps)|recent\\s+apps|recents|app\\s+switcher|switch\\s+apps") { phoneAction("recents") })
+        add(Rule("(?:open|pull\\s+down|show|expand)\\s+(?:the\\s+|my\\s+)?(?:notification\\s+(?:shade|panel|bar|drawer)|shade|notifications\\s+(?:shade|panel))|pull\\s+down\\s+(?:my\\s+)?notifications|open\\s+(?:my\\s+)?notifications") { phoneAction("notifications") })
+        add(Rule("(?:open|pull\\s+down|show|expand)\\s+(?:the\\s+)?quick\\s+settings(?:\\s+panel)?|quick\\s+settings") { phoneAction("quick_settings") })
+        add(Rule("(?:open|show|bring\\s+up)\\s+(?:the\\s+)?power\\s+(?:menu|options|dialog|button\\s+menu)|power\\s+menu|(?:restart|reboot)(?:\\s+(?:my|the)\\s+(?:phone|device))?|(?:turn|power|shut)\\s+(?:off|down)\\s+(?:my|the)\\s+(?:phone|device)|(?:turn|power|shut)\\s+(?:my|the)\\s+(?:phone|device)\\s+(?:off|down)") { phoneAction("power_menu") })
+        add(Rule("(?:enter|start|toggle|open|use|go\\s+into|turn\\s+on)?\\s*split[\\s-]?screen(?:\\s+mode)?|split\\s+the\\s+screen") { phoneAction("split_screen") })
+
+        // Weather.
+        add(Rule("(?:what's|what\\s+is|whats|how's|how\\s+is|hows|check|tell\\s+me|give\\s+me|show\\s+me|get)?\\s*(?:the\\s+)?(?:weather|forecast|weather\\s+forecast|temperature|temp)(?:\\s+(?:like|report|going\\s+to\\s+be|be\\s+like))?(.*)") { weatherCall(it.groupValues[1]) })
+        add(Rule("(?:is|will)\\s+it\\s+(?:going\\s+to\\s+|gonna\\s+)?(?:be\\s+)?(?:rain|raining|snow|snowing|sunny|cold|hot|warm|windy|cloudy|stormy|nice)(?:\\s+out(?:side)?)?(.*)") { weatherCall(it.groupValues[1]) })
+        add(Rule("(?:do|will|should)\\s+i\\s+(?:need|bring|take|wear)\\s+(?:an?\\s+)?(?:umbrella|jacket|coat|sweater|raincoat|sunscreen)(.*)") { weatherCall(it.groupValues[1]) })
+        add(Rule("how\\s+(?:hot|cold|warm|chilly)\\s+is\\s+it(?:\\s+out(?:side)?)?(.*)|how\\s+(?:hot|cold|warm)\\s+will\\s+it\\s+be(.*)") { weatherCall(it.groupValues[1].ifEmpty { it.groupValues[2] }) })
+
+        // Settings pages and App info.
+        val page = "(?:the\\s+|my\\s+)?(.+?)"
+        fun settings(said: String): ToolCall? = SettingsPages.find(said)?.let { ToolCall("open_settings", mapOf("page" to it)) }
+        add(Rule("(?:open|show|go\\s+to|take\\s+me\\s+to|bring\\s+up|launch)\\s+(?:the\\s+)?(?:app\\s+info|app\\s+details|app\\s+settings)\\s+(?:for|of)\\s+(.+)|(?:app\\s+info|app\\s+details)\\s+(?:for|of)\\s+(.+)|(?:open\\s+|show\\s+)?(.+?)\\s+app\\s+(?:info|details)") { m ->
+            m.groupValues.drop(1).firstOrNull { it.isNotBlank() }?.let { ToolCall("open_settings", mapOf("app" to it.trim().removePrefix("the ").removeSuffix(" app"))) }
+        })
+        add(Rule("(?:open|show|go\\s+to|take\\s+me\\s+to|bring\\s+up|launch|change|adjust)\\s+$page\\s+(?:settings?|options|page|preferences)") { m -> settings(m.groupValues[1]) })
+        add(Rule("(?:open|show|go\\s+to|take\\s+me\\s+to)\\s+(?:the\\s+)?settings\\s+(?:for|of)\\s+(.+)") { m -> settings(m.groupValues[1]) })
+        add(Rule("(?:open\\s+|show\\s+|go\\s+to\\s+)?(?:the\\s+)?(?:phone\\s+|system\\s+|android\\s+)?settings(?:\\s+app)?") { ToolCall("open_settings", mapOf("page" to "settings")) })
+        add(Rule("$page\\s+settings") { m -> settings(m.groupValues[1]) })
+
+        // Camera.
+        add(Rule("(?:take|snap|shoot)\\s+(?:a\\s+|me\\s+a\\s+)?selfie|selfie(?:\\s+(?:camera|mode))?|open\\s+(?:the\\s+)?(?:front|selfie)\\s+camera") { ToolCall("camera", mapOf("mode" to "selfie")) })
+        add(Rule("(?:take|snap|shoot|capture)\\s+(?:a\\s+|me\\s+a\\s+)?(?:photo|picture|pic|snapshot|shot)(?:\\s+of\\s+.+)?") { ToolCall("camera", mapOf("mode" to "photo")) })
+        add(Rule("(?:record|take|shoot|film|start\\s+recording|capture)\\s+(?:a\\s+)?video(?:\\s+of\\s+.+)?|(?:open|start)\\s+(?:the\\s+)?video\\s+camera") { ToolCall("camera", mapOf("mode" to "video")) })
+
+        // Contact details (before web search: "look up Sam's number" is a contact).
+        val fieldWords = "phone\\s+number|number|phone|cell|mobile|e-?mail(?:\\s+address)?|(?:home\\s+)?address|birthday|contact\\s+info(?:rmation)?|contact\\s+details|details|info"
+        add(Rule("(?:what's|what\\s+is|whats|give\\s+me|tell\\s+me|show\\s+me|get\\s+me|get|find|look\\s+up|send\\s+me|i\\s+need)\\s+(.+?)'s\\s+($fieldWords)") { contactInfo(it.groupValues[1], it.groupValues[2]) })
+        add(Rule("(?:what's|what\\s+is|whats|give\\s+me|show\\s+me|get\\s+me|find|look\\s+up)\\s+(?:the\\s+)?($fieldWords)\\s+(?:for|of)\\s+(.+)") { contactInfo(it.groupValues[2], it.groupValues[1]) })
+        add(Rule("when\\s+is\\s+(.+?)'s\\s+birthday") { contactInfo(it.groupValues[1], "birthday") })
+        add(Rule("where\\s+does\\s+(.+?)\\s+live") { contactInfo(it.groupValues[1], "address") })
+        add(Rule("(.+?)'s\\s+(phone\\s+number|number|e-?mail(?:\\s+address)?|address|birthday)") { contactInfo(it.groupValues[1], it.groupValues[2]) })
+
+        // Email (verbatim: the subject and message keep their capitals).
+        val mailVerb = "(?:e-?mail|mail|send\\s+(?:an?\\s+)?e-?mail\\s+to|write\\s+(?:an?\\s+)?e-?mail\\s+to|compose\\s+(?:an?\\s+)?e-?mail\\s+to|start\\s+(?:an?\\s+)?e-?mail\\s+to)"
+        fun email(to: String, subject: String = "", body: String = "") = person(to).takeIf { it.isNotEmpty() }?.let {
+            ToolCall("send_email", buildMap { put("contact", it); subject.trim().takeIf(String::isNotEmpty)?.let { s -> put("subject", s) }; body.trim().takeIf(String::isNotEmpty)?.let { b -> put("message", b) } })
+        }
+        add(Rule("$mailVerb\\s+(.+?)\\s+(?:about|with\\s+the\\s+subject|subject)\\s+(.+?)\\s+(?:saying|that\\s+says|and\\s+say)\\s+(.+)", verbatim = true) { email(it.groupValues[1], it.groupValues[2], it.groupValues[3]) })
+        add(Rule("$mailVerb\\s+(.+?)\\s+(?:saying|that\\s+says|and\\s+say|and\\s+tell\\s+(?:him|her|them))\\s+(.+)", verbatim = true) { email(it.groupValues[1], body = it.groupValues[2]) })
+        add(Rule("$mailVerb\\s+(.+?)\\s+(?:about|with\\s+the\\s+subject|subject)\\s+(.+)", verbatim = true) { email(it.groupValues[1], subject = it.groupValues[2]) })
+        add(Rule("$mailVerb\\s+(.+)", verbatim = true) { email(it.groupValues[1]) })
+
+        // Notes and lists.
+        add(Rule("(?:add|put|write)\\s+(.+?)\\s+(?:to|on|in)\\s+(?:my\\s+|the\\s+)?(?:(shopping|grocery|groceries|to-?do|todo|packing)\\s+)?(?:list|notes?)", verbatim = true) { m ->
+            val list = m.groupValues[2].lowercase().let { if (it == "groceries") "grocery" else it }.replace("todo", "to-do")
+            ToolCall("add_note", mapOf("text" to if (list.isNotEmpty()) "${list.replaceFirstChar { it.uppercase() }} list: ${m.groupValues[1].trim()}" else m.groupValues[1].trim()))
+        })
+        add(Rule("(?:take|make|write|create|jot|leave)\\s+(?:a\\s+|me\\s+a\\s+)?(?:note|memo)(?:\\s+(?:that|saying|to\\s+self|:))?\\s*:?\\s+(.+)", verbatim = true) { m ->
+            ToolCall("add_note", mapOf("text" to m.groupValues[1].trim()))
+        })
+        add(Rule("(?:note\\s+to\\s+self|jot\\s+down|note\\s+down|note\\s+that)\\s*:?\\s+(.+)", verbatim = true) { m -> ToolCall("add_note", mapOf("text" to m.groupValues[1].trim())) })
+    }
+
     // --- Rules ----------------------------------------------------------------------------
 
     private val rules: List<Rule> = buildList {
+        // Assistant tools first: their phrasings are specific ("what's on my calendar",
+        // "take a screenshot") and some would otherwise be caught by broader rules below.
+        addAll(assistantRules())
         // Questions about a setting, before the switch rules that change it.
         addAll(statusRules())
         val ringerNow = "(?:(?:my|the)\\s+)?(?:phone|ringer|ringtone|sound|it)"

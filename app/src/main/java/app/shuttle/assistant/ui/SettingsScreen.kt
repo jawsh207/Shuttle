@@ -175,6 +175,9 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         add(Access.NEARBY_DEVICES to "Ask to turn on Bluetooth.")
                     }
+                    add(Access.CALENDAR to "Tell you what's on your calendar.")
+                    add(Access.LOCATION to "The weather where you are, when you don't name a place.")
+                    if (Build.VERSION.SDK_INT >= 33) add(Access.NOTIFY to "Show reminders.")
                 }
                 Section(
                     "Permissions",
@@ -260,8 +263,9 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 val special = listOf(
                     Access.DO_NOT_DISTURB to "Turn Do Not Disturb and silent mode on and off.",
                     Access.SYSTEM_SETTINGS to "Change brightness and auto-rotate.",
-                    Access.QUICK_SETTINGS to "Optional. Switch Wi-Fi, mobile data, Bluetooth, airplane mode, battery saver and any other " +
-                        "Quick Settings tile directly, by tapping it for you. An accessibility service that only looks at the system's own screens.",
+                    Access.NOTIFICATION_ACCESS to "Optional. Read your notifications and reply to messages when you ask.",
+                    Access.QUICK_SETTINGS to "Optional. Switch Wi-Fi, mobile data, Bluetooth, battery saver and any other Quick Settings tile, " +
+                        "and take screenshots, lock the phone or go home. An accessibility service that only looks at the system's own screens.",
                 )
                 Section(
                     "Special access",
@@ -275,7 +279,7 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                         }
                     }
                     Text(
-                        "Without Quick Settings control, Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app " +
+                        "Without phone control, Wi-Fi, mobile data, NFC and Bluetooth off can't be switched by any app " +
                             "without root, so Shuttle opens the system panel for you to tap. If Android says the setting is " +
                             "restricted, open Shuttle's App info, tap ⋮ and choose Allow restricted settings first.",
                         style = MaterialTheme.typography.bodySmall,

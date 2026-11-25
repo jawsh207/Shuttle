@@ -19,6 +19,16 @@
          models/manifest.json on GitHub for model updates, and web searches: only the search
          words go to DuckDuckGo and Wikipedia. Everything else is handled on the phone. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- "What's on my calendar?" (asked for the first time it's needed). -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- The weather where you are, only when no place is named (asked for when first needed). -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Reminders ring on time. Android 12 asks for the first; 13+ grants the second to
+         reminder apps. Without either they arrive within a few minutes instead. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Reminders set before a restart are set again after it. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Answering "is Wi-Fi on?" and "is mobile data on?". Granted at install. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -41,6 +51,11 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
+        </intent>
+        <!-- Notes: the apps that can take shared text, to send "add milk to my list" to a notes app. -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
         </intent>
         <!-- The user's speech recogniser and text-to-speech engine (Distillery or any other). -->
         <intent>
@@ -92,6 +107,31 @@
             android:name=".llm.ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Optional notification access: reading notifications and replying to messages
+             (tools/MessagesService.kt). Off until the user turns it on. -->
+        <service
+            android:name=".tools.MessagesService"
+            android:exported="true"
+            android:label="@string/messages_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Reminders: shows a reminder when it's due, and sets them again after a restart. -->
+        <receiver
+            android:name=".tools.ReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".tools.ReminderRestore"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Optional Quick Settings control: taps tiles that apps can't switch themselves
              (tools/QuickTilesService.kt). Off until the user turns it on in Accessibility. -->

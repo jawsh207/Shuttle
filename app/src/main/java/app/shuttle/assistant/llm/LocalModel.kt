@@ -15,12 +15,12 @@ import java.util.concurrent.Executors
  * once per model: afterwards its state is saved to a file ([configure]'s folder), and every
  * later load restores it in a moment instead of reading it again. [prepare] does this as soon
  * as the assistant opens (just after its first frame), so a request only has to read the new
- * words. The model holds about 3 GB while loaded and is let go after ten quiet minutes. The context is capped at 8K tokens, plenty for an assistant and far less memory
- * than the model's full 128K.
+ * words. The model holds about 3 GB while loaded and is let go after ten quiet minutes. The context is capped at 10K tokens: the instructions and tool list (about 3K), the
+ * chat so far and a reply fit, using far less memory than the model's full 128K.
  */
 object LocalModel {
 
-    private const val CONTEXT = 8192
+    private const val CONTEXT = 10240
     private const val IDLE_UNLOAD_MS = 10 * 60 * 1000L
 
     sealed interface Event {

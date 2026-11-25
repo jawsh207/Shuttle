@@ -21,16 +21,20 @@ internal object Apps {
         "battery_status" to ::battery,
     )
 
-    private fun openApp(context: Context, call: ToolCall): ToolResult {
-        val wanted = call.arg("name") ?: return ToolResult.Failed("Which app?")
+    /** The installed app whose launcher name best matches [wanted]: its name and main screen. */
+    fun find(context: Context, wanted: String): Pair<String, android.content.pm.ActivityInfo>? {
         val pm = context.packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = pm.queryIntentActivities(launcher, 0).map { it.loadLabel(pm).toString() to it.activityInfo }
         val key = wanted.lowercase()
-        val match = apps.firstOrNull { it.first.lowercase() == key }
+        return apps.firstOrNull { it.first.lowercase() == key }
             ?: apps.firstOrNull { it.first.lowercase().startsWith(key) }
             ?: apps.firstOrNull { it.first.lowercase().contains(key) }
-            ?: return ToolResult.Failed("I couldn't find an app called $wanted.")
+    }
+
+    private fun openApp(context: Context, call: ToolCall): ToolResult {
+        val wanted = call.arg("name") ?: return ToolResult.Failed("Which app?")
+        val match = find(context, wanted) ?: return ToolResult.Failed("I couldn't find an app called $wanted.")
         val intent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setClassName(match.second.packageName, match.second.name)

@@ -112,7 +112,8 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   in a moment. Loading and restoring start as soon as Shuttle has drawn its first frame (not
   before, so the screen isn't slowed down), and a question only has to read its own words. The instructions never change, so the saved copy stays valid; the date
   goes in a separate short note after them. The model's memory (about 3 GB) is freed after ten
-  quiet minutes. The conversation is capped at 8,000 tokens. Replies can run to about 1,000
+  quiet minutes. The context is capped at 10,000 tokens: the instructions and tool list take
+  about 3,000, the rest is for the chat and the reply. Replies can run to about 1,000
   tokens. Sampling is gentle (temperature 0.3, with min-p and a light repeat penalty so a
   small model doesn't loop through the same list item).
 - **Stopping.** Stop asks the native code to abort, which llama.cpp checks during every step of
@@ -171,9 +172,37 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   the first three words, then two, then one, against your contacts, and shows the split it found.
   Confirming sends exactly what the card showed.
 - **Allow**: when a tool needs something you haven't granted. Normal permissions (contacts,
-  phone, SMS, nearby devices) use Android's permission dialog and then carry on. Do Not Disturb
-  access and Modify system settings are switches in Settings: **Allow** opens the page, and
-  **Try again** runs the command when you're back.
+  phone, SMS, nearby devices, calendar, location, notifications) use Android's permission
+  dialog and then carry on. Do Not Disturb access, Modify system settings, notification access
+  and phone control are switches in Settings: **Allow** opens the page, and **Try again** runs
+  the command when you're back.
+
+## Assistant tools
+
+- **Reminders** (`tools/Reminders.kt`): Shuttle's own notifications, set with AlarmManager
+  for the time said (`engine/When.kt` reads "at 6", "tomorrow at 9", "Friday", "in 20
+  minutes"). They're kept in private storage and set again after a restart or update. "Remind
+  me in 5 minutes" with nothing to remind still starts a timer.
+- **Calendar** (`tools/CalendarTools.kt`): reading lists the day's (or week's) events from
+  every calendar shown on the phone. Adding opens the calendar app's own new-event screen,
+  filled in, for the user to save; Shuttle never writes to a calendar.
+- **Messages** (`tools/Messages.kt`, with `MessagesService`, a notification listener the
+  user turns on): reads the current notifications (chat apps' recent messages, others'
+  text), newest first, optionally only from an app or person. Replies use the message's own
+  Reply button, so the app it came from sends it, after a confirmation card. With nothing to
+  reply to, "reply to Sam…" sends a text instead.
+- **Weather** (`engine/Weather.kt`, `tools/WeatherTool.kt`): Open-Meteo's free, keyless
+  forecast and place search. Without a named place it uses the phone's approximate location
+  from Android's location service, rounded to about a kilometre before it's sent. Units follow
+  the region. Like web search, it runs in the background with a card that fills in.
+- **Settings shortcuts, camera, contacts, email, notes** (`tools/Shortcuts.kt`): settings
+  pages by name (`engine/SettingsPages.kt`) and any app's App info; the camera for a photo,
+  selfie or video; a contact's number, email, address or birthday; an email started in the
+  email app; a note sent to the notes app (the only notes-like app that takes shared text, or
+  the share sheet).
+- **Instant answers** (`engine/InstantAnswers.kt`): arithmetic, unit conversions and the time
+  in other places, answered before the model (which is slower and can get sums wrong). Only
+  a question it fully understands is answered there.
 
 ## What Android lets an app do
 
@@ -182,30 +211,40 @@ switch Wi-Fi, mobile data or NFC, so those tools open the system's floating pane
 setting. Bluetooth on uses the system's confirmation prompt. Bluetooth off, airplane mode,
 location, hotspot and dark theme open their settings pages. Everything else changes directly.
 
-The optional **Quick Settings control** (`tools/QuickTilesService.kt`, an accessibility
-service) gets around that the way a person would. With it on, those switches and the
-`quick_setting` tool (any tile by name) are done by `tools/QuickTiles.kt`. It opens Quick
-Settings, finds the tile by its label (`engine/QuickTileNames.kt` matches names and reads
-"On"/"Off"), pages through if needed, taps it only if that changes anything, checks the
-result and closes the shade. Real tiles (which say whether they're on) are preferred over
-status bar icons with the same name, such as the Wi-Fi and Bluetooth icons at the top of the
-shade. Newer Android splits a large tile in two: the icon switches it and the rest opens its details.
-So Shuttle taps the tile's own switch element if it has one, then touches the icon (the start
-of a wide tile), then the tile as a whole. It checks after each try whether the tile changed,
-and goes back if a tap opened the details instead. It never taps again once the tile has
-changed. To reach later pages it pages the element holding the most tiles (not the
-notification list), and if the tiles shown don't change, swipes across them instead. When a
-switch's tile isn't found, its fallback panel says so and lists the tiles that were found. Mobile data never uses a Wi-Fi tile or switch. It looks on every page for a
-tile called Mobile data (or one named after the carrier that mentions LTE, 5G and so on).
-Only then does it try the combined Internet tile, and only through its dialog: an Internet
-tile that switches by itself is Wi-Fi's, so the tap is undone. Android's own confirmations ("Turn off mobile data?") are
-answered with the matching button. A dialog Shuttle can't work out is left open, and the
-reply quotes what it showed. A tile that opens a dialog (Internet, Bluetooth) has the right
-switch in the dialog used instead. This watches the screen for a second or two, so it runs on
-its own thread: the assistant shows a "Tapping Quick Settings…" card and fills it in, and
-several commands in one sentence wait for each other. If no tile matches, a switch falls back
-to its panel or settings page. The service hears only the system UI's events and reads the
-shade only while carrying out a request.
+### Phone control (optional)
+
+The optional **phone control** service (`tools/QuickTilesService.kt`, an accessibility
+service) gets around that the way a person would. It hears only the system UI's events and
+reads the shade only while carrying out a request.
+
+- **Quick Settings tiles.** With it on, those switches and the `quick_setting` tool (any tile
+  by name) are done by `tools/QuickTiles.kt`. It opens Quick Settings, finds the tile by its
+  label (`engine/QuickTileNames.kt` matches names and reads "On"/"Off"), taps it only if that
+  changes anything, checks the result and closes the shade.
+- **Finding the tile.** Real tiles (which say whether they're on) are preferred over status
+  bar icons with the same name, such as the Wi-Fi and Bluetooth icons at the top of the shade.
+  Later pages are reached by paging the element holding the most tiles (not the notification
+  list), or by swiping across the tiles if that changes nothing.
+- **Tapping.** Newer Android splits a large tile in two: the icon switches it, the rest opens
+  its details. So Shuttle taps the tile's own switch element if it has one, then touches the
+  icon (the start of a wide tile), then the tile as a whole, checking after each try and going
+  back if a tap opened the details. It never taps again once the tile has changed.
+- **Dialogs.** A tile that opens a dialog (Internet, Bluetooth) has the right switch in it
+  used. Android's own confirmations ("Turn off mobile data?") are answered with the matching
+  button. A dialog Shuttle can't work out is left open, and the reply quotes it.
+- **Mobile data** never uses a Wi-Fi tile or switch. Every page is searched for a tile called
+  Mobile data (or one named after the carrier that mentions LTE, 5G and so on) before the
+  combined Internet tile is tried, and that only through its dialog: an Internet tile that
+  switches by itself is Wi-Fi's, so the tap is undone.
+- **Fallbacks.** If no tile matches, a switch opens its panel or settings page, saying so and
+  listing the tiles found.
+- **Timing.** Tapping watches the screen for a second or two, so it runs on its own thread:
+  the assistant shows a "Tapping Quick Settings…" card and fills it in, and several commands
+  in one sentence wait for each other.
+- **Phone actions** (`tools/PhoneActions.kt`): screenshot, lock, home, back, recent apps,
+  notifications, Quick Settings, power menu and split screen, Android's own actions for
+  accessibility services. The panel closes first and the action follows a moment later, so a
+  screenshot shows the app underneath.
 
 Directions use a standard map link, so they open in whatever maps app you have. Alarms and
 timers are created in your own clock app, which rings them.
@@ -247,6 +286,17 @@ timers are created in your own clock app, which rings them.
 | `engine/SmallTalk.kt` | Replies to hello, thanks, "what can you do?", "never mind" |
 | `tools/*.kt` | The device tools, grouped as above (`Status.kt` answers "is it on?") |
 | `tools/QuickTiles.kt` | Tapping Quick Settings tiles: finding, reading, tapping, dialogs |
-| `tools/QuickTilesService.kt` | The optional accessibility service that makes the tapping possible |
+| `tools/QuickTilesService.kt` | The optional accessibility service (phone control) behind tiles and phone actions |
+| `tools/PhoneActions.kt` | Screenshot, lock, home, back, recents, power menu and the like |
+| `tools/Reminders.kt` | Reminders: scheduling, showing, restoring after a restart |
+| `tools/CalendarTools.kt` | Reading the calendar; adding events through the calendar app |
+| `tools/Messages.kt` | Reading notifications and replying to messages; the notification listener |
+| `tools/WeatherTool.kt` | Fetching the weather; the phone's approximate location |
+| `tools/Shortcuts.kt` | Settings pages, App info, camera, contact details, email, notes |
+| `engine/When.kt` | Days and times as said, for reminders and events |
+| `engine/InstantAnswers.kt` | Arithmetic, unit conversions, time elsewhere |
+| `engine/Weather.kt` | Open-Meteo requests and the weather report |
+| `engine/Json.kt` | A small JSON reader (testable without Android) |
+| `engine/SettingsPages.kt` | Settings pages by name |
 | `engine/QuickTileNames.kt` | Tile labels for each switch, name matching, reading on/off |
 | `docs/tools.json` | Generated tool list for model work (kept in sync by a unit test) |

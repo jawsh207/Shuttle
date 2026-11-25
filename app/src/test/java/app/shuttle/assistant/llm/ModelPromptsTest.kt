@@ -32,7 +32,8 @@ class ModelPromptsTest {
         // Read once per model and then saved, but the first read happens on the phone's CPU,
         // so growth should be a choice: raise this deliberately, not by accident.
         val size = ModelPrompts.prefix().length
-        assertTrue("prefix is $size chars", size < 7500)
+        // About 3K tokens: read once per model and saved, but it shares the 10K context with the chat.
+        assertTrue("prefix is $size chars", size < 12000)
     }
 
     @Test fun promptStartIsStableAndDatedOnly() {
