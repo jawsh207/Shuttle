@@ -28,6 +28,12 @@ object LlamaEngine {
      */
     external fun nativeGenerate(handle: Long, prompt: String, maxTokens: Int, temperature: Float, sink: PieceSink): Int
 
+    /** Saves what the model has read so far to [path]; false if nothing was saved. */
+    external fun nativeSaveState(handle: Long, path: String): Boolean
+
+    /** Restores a saved state; returns the tokens restored, or 0 if the file doesn't fit. */
+    external fun nativeLoadState(handle: Long, path: String): Int
+
     /** Stops a running [nativeGenerate] as soon as possible, even mid-prompt. Any thread. */
     external fun nativeCancel(handle: Long)
 

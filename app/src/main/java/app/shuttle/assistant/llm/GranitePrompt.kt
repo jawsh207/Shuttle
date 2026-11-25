@@ -36,10 +36,15 @@ object GranitePrompt {
 
     /**
      * The full prompt for the next reply. [tools] are single-line JSON objects
-     * (`{"name": …, "description": …, "parameters": …}`); empty means no tools.
+     * (`{"name": …, "description": …, "parameters": …}`); empty means no tools. [note] is a
+     * short extra system message placed after the shared start (the template allows system
+     * messages there).
      */
-    fun build(system: String, tools: List<String>, messages: List<Message>): String = buildString {
+    fun build(system: String, tools: List<String>, messages: List<Message>, note: String = ""): String = buildString {
         append(systemBlock(system, tools))
+        // Things that change (the date) go in their own small system turn after the shared
+        // start, so the start itself never changes and its saved state stays valid.
+        if (note.isNotEmpty()) append("<|im_start|>system\n").append(note).append("<|im_end|>\n")
         var i = 0
         while (i < messages.size) {
             val m = messages[i]

@@ -156,7 +156,7 @@ object ModelManager {
             .apply()
         main.post { update = null }
         // Get it ready for the first question.
-        LocalModel.prepare(target, ModelPrompts.prefix())
+        LocalModel.prepare(target)
         return State.Ready(spec, target)
     }
 

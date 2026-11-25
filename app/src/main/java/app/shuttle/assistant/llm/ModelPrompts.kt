@@ -15,10 +15,10 @@ import java.util.Locale
  *
  * The model is a general assistant first (questions, recipes, explanations) and a phone
  * controller second; small models otherwise decide everything is a phone request. Every word
- * here is read by the phone's CPU before each answer can start, so it's kept short and, above
- * all, identical from one request to the next: [LocalModel] reads it once and
- * reuses it. That's why the system message carries only the date (it changes once a day), not
- * the time ("what time is it?" is answered by a tool anyway).
+ * here is read by the phone's CPU before answers can start, so it's kept short and, above all,
+ * identical forever: [LocalModel] reads it once per model and saves the result. The date,
+ * which changes, goes separately in [note]; the time isn't sent at all ("what time is it?" is
+ * answered by a tool).
  *
  * The model sees a compact version of the phone's tools ([tools]): the twelve on/off switches
  * are one `set_switch` tool and every status question is one `check_setting`, which roughly
@@ -67,17 +67,18 @@ object ModelPrompts {
 
     val tools: List<String> = specs.map(ToolSchemas::toolJson)
 
-    fun system(today: LocalDate = LocalDate.now()): String {
-        val date = today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH))
-        return "You are Shuttle, a helpful general assistant running on the user's Android phone. " +
+    fun system(): String =
+        "You are Shuttle, a helpful general assistant running on the user's Android phone. " +
             "Answer any question from your own knowledge: facts, explanations, how-tos, recipes, advice, writing and maths. " +
             "Be concise, and use a short list for steps or ingredients. " +
             "You can also control the phone with the functions below; call one only when the user wants something done on the phone, " +
             "and never claim an action happened unless you called a function for it. " +
             "You can't browse the internet and your knowledge has a cutoff, so for things that change " +
-            "(who holds an office, news, prices, weather, scores) give what you know and say it may be out of date. " +
-            "Today is $date."
-    }
+            "(who holds an office, news, prices, weather, scores) give what you know and say it may be out of date."
+
+    /** The date, sent after the shared start so the start never changes. */
+    fun note(today: LocalDate = LocalDate.now()): String =
+        "Today is " + today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)) + "."
 
     /** The prompt start every request shares, for [LocalModel.prepare]. */
     fun prefix(): String = GranitePrompt.systemBlock(system(), tools)

@@ -10,9 +10,10 @@ import java.util.concurrent.Executors
  * background thread, and unloads it after a few idle minutes to give the memory back.
  *
  * Reading a prompt is the slow part on a phone's CPU, far slower than writing the reply, and
- * every prompt starts with the same instructions and tool list. So [prepare] loads the model
- * and reads that shared start as soon as the assistant opens; a request then only has to read
- * the new words. The model holds about 3 GB while loaded and is let go after ten quiet
+ * every prompt starts with the same instructions and tool list. That shared start is read only
+ * once per model: afterwards its state is saved to a file ([configure]'s folder), and every
+ * later load restores it in a moment instead of reading it again. [prepare] does this as soon
+ * as the assistant opens, so a request only has to read the new words. The model holds about 3 GB while loaded and is let go after ten quiet
  * minutes. The context is capped at 8K tokens, plenty for an assistant and far less memory
  * than the model's full 128K.
  */
@@ -38,6 +39,23 @@ object LocalModel {
     @Volatile private var loadedPath: String? = null
     @Volatile private var cancelled = false
 
+    @Volatile private var prefix: String = ""
+    @Volatile private var stateDir: File? = null
+
+    /** The prompt start every request shares, and where its saved state is kept. */
+    fun configure(prefix: String, stateDir: File) {
+        this.prefix = prefix
+        this.stateDir = stateDir
+    }
+
+    /** One file per model and instructions; a change to either reads them afresh. */
+    private fun stateFile(model: File): File? {
+        val dir = stateDir ?: return null
+        if (prefix.isEmpty()) return null
+        val key = Integer.toHexString(prefix.hashCode()) + "-" + prefix.length
+        return File(dir, "${model.nameWithoutExtension}-$key.state")
+    }
+
     /** Stops the reply being written straight away, even while it's still reading. */
     fun cancel() {
         cancelled = true
@@ -45,15 +63,23 @@ object LocalModel {
     }
 
     /**
-     * Loads the model and reads [prefix] (the instructions and tools every prompt starts
-     * with) in the background, so the next request only reads what's new. Does nothing if a
-     * reply is being written.
+     * Loads the model and gets the shared prompt start ready in the background: restored from
+     * its saved state, or read and then saved the first time. Waits behind a running reply.
      */
-    fun prepare(file: File, prefix: String) {
+    fun prepare(file: File) {
         main.removeCallbacks(unload)
         worker.execute {
             try {
-                if (ensureLoaded(file)) LlamaEngine.nativeGenerate(handle, prefix, 0, 0f) { false }
+                if (!ensureLoaded(file) || prefix.isEmpty()) return@execute
+                // Cheap when the state was restored: everything but the last token is reused.
+                val code = LlamaEngine.nativeGenerate(handle, prefix, 0, 0f) { false }
+                val state = stateFile(file)
+                if (code == 0 && state != null && !state.exists()) {
+                    state.parentFile?.mkdirs()
+                    // Only one saved state is worth keeping.
+                    state.parentFile?.listFiles { f -> f.name.endsWith(".state") }?.forEach { it.delete() }
+                    if (!LlamaEngine.nativeSaveState(handle, state.path)) state.delete()
+                }
             } catch (_: Throwable) {
                 // A failed warm-up just means the first request does the work instead.
             } finally {
@@ -124,7 +150,13 @@ object LocalModel {
         val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 8).let { if (it > 4) 4 else it }
         handle = LlamaEngine.nativeLoad(file.path, CONTEXT, threads)
         loadedPath = if (handle != 0L) file.path else null
-        return handle != 0L
+        if (handle == 0L) return false
+        // Restore the instructions already read on an earlier run; a file from another model or
+        // llama.cpp version simply doesn't load and is replaced on the next prepare.
+        stateFile(file)?.takeIf { it.exists() }?.let { state ->
+            if (LlamaEngine.nativeLoadState(handle, state.path) == 0) state.delete()
+        }
+        return true
     }
 
     /** On the worker thread. */

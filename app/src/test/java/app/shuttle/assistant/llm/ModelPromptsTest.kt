@@ -35,10 +35,12 @@ class ModelPromptsTest {
     }
 
     @Test fun promptStartIsStableAndDatedOnly() {
-        val s = ModelPrompts.system(LocalDate.of(2026, 11, 24))
-        assertTrue(s, s.contains("Tuesday, November 24, 2026"))
-        assertEquals(ModelPrompts.prefix(), ModelPrompts.prefix())
-        val full = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, listOf(GranitePrompt.Message(GranitePrompt.Role.USER, "hi")))
-        assertTrue(full.startsWith(ModelPrompts.prefix()))
+        assertEquals("Today is Tuesday, November 24, 2026.", ModelPrompts.note(LocalDate.of(2026, 11, 24)))
+        assertTrue(!ModelPrompts.prefix().contains("Today is"))
+        val full = GranitePrompt.build(
+            ModelPrompts.system(), ModelPrompts.tools, listOf(GranitePrompt.Message(GranitePrompt.Role.USER, "hi")),
+            note = ModelPrompts.note(LocalDate.of(2026, 11, 24)),
+        )
+        assertTrue(full.startsWith(ModelPrompts.prefix() + "<|im_start|>system\nToday is Tuesday, November 24, 2026.<|im_end|>\n<|im_start|>user\nhi"))
     }
 }

@@ -187,7 +187,11 @@ class AssistantViewModel : ViewModel() {
         exchanges += placeholder
         thinking = true
         stopped = false
-        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, history + GranitePrompt.Message(GranitePrompt.Role.USER, asked))
+        val prompt = GranitePrompt.build(
+            ModelPrompts.system(), ModelPrompts.tools,
+            history + GranitePrompt.Message(GranitePrompt.Role.USER, asked),
+            note = ModelPrompts.note(),
+        )
         LocalModel.generate(model.file, prompt) { event ->
             when (event) {
                 is LocalModel.Event.Status -> replace(placeholder.id) { it.copy(status = event.text) }

@@ -12,6 +12,10 @@ import java.net.URL
  * be updated (a newer Granite, a better build) without an app update. A copy of the current
  * choice is built in ([BUILT_IN]), so a phone that can't reach GitHub still knows what to
  * download. Every download is checked against the [sha256] here before it's used.
+ *
+ * The build is Q4_0 rather than the more common Q4_K_M: about the same size and quality, but
+ * llama.cpp rearranges Q4_0 weights for the phone CPU's dot-product instructions when it loads
+ * them, which usually makes reading prompts and writing replies two to three times faster on ARM.
  */
 data class ModelSpec(
     val id: String,
@@ -25,19 +29,19 @@ data class ModelSpec(
 ) {
     val fileName: String get() = "$id.gguf"
 
-    /** "2.2 GB" */
+    /** "2.1 GB" */
     val sizeLabel: String get() = "%.1f GB".format(size / 1_000_000_000.0)
 
     companion object {
         const val MANIFEST_URL = "https://raw.githubusercontent.com/jawsh207/Shuttle/main/models/manifest.json"
 
         val BUILT_IN = ModelSpec(
-            id = "granite-4.2-3b-q4_k_m",
+            id = "granite-4.2-3b-q4_0",
             name = "Granite 4.2 3B",
             format = "granite",
-            url = "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_K_M.gguf",
-            sha256 = "e0406663965846ae22a403456eb826ccce5f450840491f71952f18a7cb78e7d5",
-            size = 2_244_011_552,
+            url = "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/main/granite-4.2-3b-Q4_0.gguf",
+            sha256 = "d34a4a7c0b230d3f544eca502beb7e04efc3a0ebd59e2f2df50058f23cc20711",
+            size = 2_129_118_752,
             license = "Apache-2.0",
         )
 

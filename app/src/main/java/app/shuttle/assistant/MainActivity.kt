@@ -55,7 +55,8 @@ class MainActivity : ComponentActivity() {
         DeviceTools.prepare(this)
         ModelManager.start(this)
         // Load the model and read its instructions now, so the first question is quick.
-        ModelManager.ready?.let { LocalModel.prepare(it.file, ModelPrompts.prefix()) }
+        LocalModel.configure(ModelPrompts.prefix(), File(filesDir, "model-state"))
+        ModelManager.ready?.let { LocalModel.prepare(it.file) }
         val prefs = VoicePrefs(this)
         val chatPrefs = ChatPrefs(this)
         val store = ChatStore(File(filesDir, "chats"))

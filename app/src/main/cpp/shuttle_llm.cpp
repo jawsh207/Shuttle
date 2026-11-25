@@ -5,10 +5,12 @@
 // conversation logic live in Kotlin; this file only turns text into tokens and tokens back
 // into text.
 //
-// Two details matter on a phone:
+// Three details matter on a phone:
 // - Prefix reuse. Each turn's prompt is the whole conversation so far, so it mostly repeats
 //   the previous one. The tokens already in the model's memory (KV cache) are kept and only
 //   the new part is processed, which keeps replies quick as a chat grows.
+// - Saved state. The instructions every prompt starts with can be read once and saved to a
+//   file (nativeSaveState); loading that file is far faster than reading them again.
 // - UTF-8. A token can end in the middle of a multi-byte character (emoji, accents). Pieces
 //   are held back until they form complete characters and sent to Kotlin as bytes, because
 //   JNI's NewStringUTF can't take 4-byte characters.
@@ -219,6 +221,40 @@ Java_app_shuttle_assistant_llm_LlamaEngine_nativeGenerate(
     }
     llama_sampler_free(smpl);
     return result;
+}
+
+// Saves what the model has read so far (the KV cache and its tokens) to `path`, so a later
+// load can skip reading it again. Returns false if there's nothing to save or writing failed.
+JNIEXPORT jboolean JNICALL
+Java_app_shuttle_assistant_llm_LlamaEngine_nativeSaveState(JNIEnv * env, jobject, jlong handle, jstring jpath) {
+    auto * e = reinterpret_cast<Engine *>(handle);
+    if (!e || e->cached.empty()) return JNI_FALSE;
+    const char * path = env->GetStringUTFChars(jpath, nullptr);
+    const size_t written = llama_state_seq_save_file(e->ctx, path, 0, e->cached.data(), e->cached.size());
+    env->ReleaseStringUTFChars(jpath, path);
+    return written > 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+// Restores a state saved by nativeSaveState. Returns the number of tokens restored, or 0 if
+// the file doesn't fit this model or this build of llama.cpp (the caller then reads normally).
+JNIEXPORT jint JNICALL
+Java_app_shuttle_assistant_llm_LlamaEngine_nativeLoadState(JNIEnv * env, jobject, jlong handle, jstring jpath) {
+    auto * e = reinterpret_cast<Engine *>(handle);
+    if (!e) return 0;
+    const char * path = env->GetStringUTFChars(jpath, nullptr);
+    std::vector<llama_token> tokens(llama_n_ctx(e->ctx));
+    size_t count = 0;
+    llama_memory_clear(llama_get_memory(e->ctx), true);
+    const size_t read = llama_state_seq_load_file(e->ctx, path, 0, tokens.data(), tokens.size(), &count);
+    env->ReleaseStringUTFChars(jpath, path);
+    if (read == 0 || count == 0) {
+        llama_memory_clear(llama_get_memory(e->ctx), true);
+        e->cached.clear();
+        return 0;
+    }
+    tokens.resize(count);
+    e->cached = tokens;
+    return static_cast<jint>(count);
 }
 
 // Asks a running nativeGenerate to stop as soon as possible. Safe from any thread.

@@ -95,7 +95,9 @@ Anything else goes to the on-device model (next section).
 
 ## The on-device model
 
-Shuttle's model is IBM's Granite 4.2 3B, running on the phone through llama.cpp. It handles
+Shuttle's model is IBM's Granite 4.2 3B (the Q4_0 build, which llama.cpp rearranges at load
+time for the phone CPU's dot-product instructions, making it much faster than other 4-bit
+builds), running on the phone through llama.cpp. It handles
 whatever the fast path doesn't: questions, conversation, unusual wordings, follow-ups.
 
 - **The engine.** llama.cpp is part of the app (a git submodule at `app/src/main/cpp/llama.cpp`,
@@ -104,10 +106,12 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   re-uses what the model already read last time, so long chats stay quick.
 - **Loading and memory.** `llm/LocalModel.kt` runs one reply at a time on a background thread.
   On a phone's CPU, reading a prompt is far slower than writing the answer, and every prompt
-  starts with the same instructions and tool list. So when Shuttle opens, it loads the model
-  (a few seconds) and reads that shared start straight away; a question then only has to read
-  the new words. The model's memory (about 3 GB) is freed after ten quiet minutes. The
-  conversation is capped at 8,000 tokens.
+  starts with the same instructions and tool list. That start is read only once per model:
+  the result is saved to a file in the app's private storage, and every later load restores it
+  in a moment. Loading and restoring happen as soon as Shuttle opens, so a question only has to
+  read its own words. The instructions never change, so the saved copy stays valid; the date
+  goes in a separate short note after them. The model's memory (about 3 GB) is freed after ten
+  quiet minutes. The conversation is capped at 8,000 tokens.
 - **Stopping.** Stop asks the native code to abort, which llama.cpp checks during every step of
   its work, so it stops even while a long prompt is still being read.
 - **Getting the model.** `llm/ModelManager.kt` keeps track of it and `llm/ModelDownloadService.kt`

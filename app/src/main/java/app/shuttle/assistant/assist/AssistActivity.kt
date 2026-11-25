@@ -33,6 +33,7 @@ import app.shuttle.assistant.ui.AssistantViewModel
 import app.shuttle.assistant.ui.theme.ShuttleTheme
 import app.shuttle.assistant.voice.VoicePrefs
 import app.shuttle.assistant.voice.VoiceSession
+import java.io.File
 
 /**
  * The assistant panel that opens over whatever app is on screen.
@@ -61,7 +62,8 @@ class AssistActivity : ComponentActivity() {
         DeviceTools.prepare(this)
         ModelManager.start(this)
         // Load the model and read its instructions now, so the first question is quick.
-        ModelManager.ready?.let { LocalModel.prepare(it.file, ModelPrompts.prefix()) }
+        LocalModel.configure(ModelPrompts.prefix(), File(filesDir, "model-state"))
+        ModelManager.ready?.let { LocalModel.prepare(it.file) }
         val prefs = VoicePrefs(this)
         val session = VoiceSession(this).also { voice = it }
         // Listen on open only for a fresh panel, not when it's recreated after rotation.

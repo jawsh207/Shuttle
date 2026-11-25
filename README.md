@@ -72,7 +72,7 @@ Anything the commands above don't cover (questions, conversation, unusual wordin
 [llama.cpp](https://github.com/ggml-org/llama.cpp). There's no account, no API key and no usage
 limit, and nothing you ask leaves the phone.
 
-- **Download once:** Settings › Model › Download (2.2 GB, Wi-Fi only by default). It continues
+- **Download once:** Settings › Model › Download (2.1 GB, Wi-Fi only by default). It continues
   with Shuttle closed, shows progress in the notification shade, resumes after a dropped
   connection, and pauses on mobile data while "Wi-Fi only" is on. Until then, phone commands
   work and other requests get a short note saying the model isn't downloaded yet.
@@ -86,10 +86,10 @@ limit, and nothing you ask leaves the phone.
   Settings offers the update. Users never pick or configure a model.
 - **Tools:** the model can use every phone command. Calls and texts it starts still stop at the
   confirmation card, and it can't skip it.
-- **Speed:** the phone's processor reads the model's instructions once, when Shuttle opens, and
-  reuses them, so each question only has to read your words. The first question after opening
-  can still wait a little for that. Replies stream in as they're written, and **Stop** works at
-  any point.
+- **Speed:** the model's instructions are read once per model and the result is saved, so
+  later openings restore it in a moment and each question only has to read your words. The
+  build used (Q4_0) is one llama.cpp runs especially fast on phone CPUs. Replies stream in as
+  they're written, and **Stop** works at any point.
 - **Memory:** about 3 GB while loaded. It loads when Shuttle opens (if downloaded) and unloads
   after ten quiet minutes.
 - **No internet yet:** the model answers from what it learned in training, so for things that
