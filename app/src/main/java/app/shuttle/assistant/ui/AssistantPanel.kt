@@ -1,5 +1,13 @@
 package app.shuttle.assistant.ui
 
+import app.shuttle.assistant.text.Markdown
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.ContentCopy
+import android.widget.Toast
+import android.os.Build
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -93,6 +101,8 @@ fun AssistantPanel(
     val focus = remember { FocusRequester() }
     val list = rememberLazyListState()
     val talk = remember(vm, voice) { VoiceConversation(context, vm, voice, speakReplies, onClose) }
+    // The answer being read aloud with its speaker button, if any.
+    var readingId by remember { mutableStateOf<Int?>(null) }
 
     // Which exchange asked for a runtime permission, so its call can run once it's granted.
     var waitingId by rememberSaveable { mutableStateOf(-1) }
@@ -154,6 +164,19 @@ fun AssistantPanel(
                             }
                         },
                         onRetry = { talk.retry(exchange) },
+                        reading = readingId == exchange.id && state == VoiceSession.State.Speaking,
+                        onRead = voice?.let { v ->
+                            { text: String ->
+                                if (readingId == exchange.id && state == VoiceSession.State.Speaking) {
+                                    v.stopSpeaking()
+                                    readingId = null
+                                } else {
+                                    v.cancelListening()
+                                    readingId = exchange.id
+                                    v.speak(Markdown.plain(text)) { readingId = null }
+                                }
+                            }
+                        },
                     )
                 }
             }
@@ -225,6 +248,8 @@ internal fun ExchangeView(
     onCancel: () -> Unit = {},
     onGrant: (ToolResult.NeedsAccess) -> Unit = {},
     onRetry: () -> Unit = {},
+    reading: Boolean = false,
+    onRead: ((String) -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // What was asked, as a bubble on the right (once, for a multi-part request).
@@ -237,7 +262,7 @@ internal fun ExchangeView(
                 Text(exchange.asked, Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
             }
         }
-        ResultCard(exchange, onConfirm, onCancel, onGrant, onRetry)
+        ResultCard(exchange, onConfirm, onCancel, onGrant, onRetry, reading, onRead)
     }
 }
 
@@ -248,6 +273,8 @@ private fun ResultCard(
     onCancel: () -> Unit,
     onGrant: (ToolResult.NeedsAccess) -> Unit,
     onRetry: () -> Unit,
+    reading: Boolean = false,
+    onRead: ((String) -> Unit)? = null,
 ) {
     val result = exchange.result
     val colors = when (result) {
@@ -275,6 +302,9 @@ private fun ResultCard(
             }
             val sources = (result as? ToolResult.Done)?.sources.orEmpty()
             if (sources.isNotEmpty()) Sources(sources)
+            if (result is ToolResult.Done && result.text.isNotBlank() && !exchange.thinking) {
+                AnswerActions(result.text, reading, onRead)
+            }
             if (!exchange.settled && !exchange.thinking) {
                 when (result) {
                     is ToolResult.Confirm -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -311,6 +341,37 @@ private fun Sources(sources: List<Source>) {
                     Text("${i + 1}. ${source.title}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(source.site, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Under each answer: copy it (as plain text, without the Markdown symbols) and read it aloud
+ * with the phone's text-to-speech (tap again to stop).
+ */
+@Composable
+private fun AnswerActions(text: String, reading: Boolean, onRead: ((String) -> Unit)?) {
+    val context = LocalContext.current
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    // Nudged left so the icons line up with the text above.
+    Row(Modifier.offset(x = (-12).dp, y = 4.dp)) {
+        IconButton(onClick = {
+            val clipboard = context.getSystemService(ClipboardManager::class.java)
+            clipboard?.setPrimaryClip(ClipData.newPlainText("Shuttle", Markdown.copyText(text)))
+            // Android 13 and later show their own "Copied" note.
+            if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+        }) {
+            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy", tint = tint, modifier = Modifier.size(20.dp))
+        }
+        if (onRead != null) {
+            IconButton(onClick = { onRead(text) }) {
+                Icon(
+                    if (reading) Icons.Rounded.Stop else Icons.AutoMirrored.Rounded.VolumeUp,
+                    contentDescription = if (reading) "Stop reading" else "Read aloud",
+                    tint = if (reading) MaterialTheme.colorScheme.primary else tint,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }

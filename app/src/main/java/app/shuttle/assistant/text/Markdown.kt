@@ -147,6 +147,22 @@ object Markdown {
         return spans
     }
 
+    /**
+     * The reply as plain text to copy: lines, bullets ("•") and numbers kept, the markup
+     * (asterisks, hashes, backticks) gone, links as "text (address)".
+     */
+    fun copyText(text: String): String = parse(text).joinToString("\n") { block ->
+        fun words(spans: List<Span>) = spans.joinToString("") { s -> if (s.url != null && s.url != s.text) "${s.text} (${s.url})" else s.text }.trim()
+        when (block) {
+            is Block.Paragraph -> words(block.spans)
+            is Block.Heading -> words(block.spans)
+            is Block.Item -> "  ".repeat(block.depth) + block.marker + " " + words(block.spans)
+            is Block.Quote -> words(block.spans)
+            is Block.Code -> block.text
+            Block.Rule, Block.Gap -> ""
+        }
+    }.replace(Regex("\n{3,}"), "\n\n").trim()
+
     /** The reply as words to speak: no markup, list items and headings as sentences. */
     fun plain(text: String): String = parse(text).mapNotNull { block ->
         fun words(spans: List<Span>) = spans.joinToString("") { it.text }.trim()

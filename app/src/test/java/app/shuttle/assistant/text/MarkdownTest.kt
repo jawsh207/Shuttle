@@ -59,4 +59,12 @@ class MarkdownTest {
             Markdown.plain("### Quick dough\n- Mix **flour** and water\n- Knead it\n\nRest for *an hour*."),
         )
     }
+
+    @Test
+    fun copyText() {
+        assertEquals(
+            "Quick dough\n\n1. Mix flour and water\n2. Knead it\n  • ten minutes\n\nSee GrapheneOS (https://grapheneos.org).",
+            Markdown.copyText("### Quick dough\n\n1. Mix **flour** and water\n2. Knead it\n   - ten minutes\n\nSee [GrapheneOS](https://grapheneos.org)."),
+        )
+    }
 }

@@ -86,7 +86,9 @@ settings, where Android keeps the "Voice input" choice.
      the opposite ("Wi-Fi is on. Turn it off?"). Android hides the hotspot's state from apps,
      so that question offers its settings instead. The flashlight's state only arrives through
      a notification from Android, which Shuttle starts listening for when the panel opens.
-5. **A card shows what happened** (`ui/AssistantPanel.kt`), with any Markdown in an answer
+5. **A card shows what happened** (`ui/AssistantPanel.kt`), with copy and read-aloud buttons
+   under each answer (copying drops the Markdown symbols; reading uses the phone's
+   text-to-speech, and tapping again stops it), with any Markdown in an answer
    shown as formatting and left out when it's read aloud (`text/Markdown.kt`). The
    conversation itself is kept by `ui/AssistantViewModel.kt`.
 
