@@ -355,8 +355,8 @@ private fun Sources(sources: List<Source>) {
 private fun AnswerActions(text: String, reading: Boolean, onRead: ((String) -> Unit)?) {
     val context = LocalContext.current
     val tint = MaterialTheme.colorScheme.onSurfaceVariant
-    // Nudged left so the icons line up with the text above.
-    Row(Modifier.offset(x = (-12).dp, y = 4.dp)) {
+    // On the right, where a thumb reaches them, nudged so the icons line up with the text's edge.
+    Row(Modifier.fillMaxWidth().offset(x = 12.dp, y = 4.dp), horizontalArrangement = Arrangement.End) {
         IconButton(onClick = {
             val clipboard = context.getSystemService(ClipboardManager::class.java)
             clipboard?.setPrimaryClip(ClipData.newPlainText("Shuttle", Markdown.copyText(text)))
