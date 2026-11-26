@@ -166,6 +166,49 @@ object ToolSchemas {
             "add_note", "Save a note or list item in the notes app.",
             listOf(Param("text", ParamType.STRING, "The note.")),
         ),
+        ToolSpec(
+            "play_music", "Play a song, artist, album, playlist or genre in the music app.",
+            listOf(
+                Param("query", ParamType.STRING, "What to play."),
+                Param("kind", ParamType.STRING, "What it is.", required = false, options = listOf("song", "artist", "album", "playlist", "genre", "any")),
+                Param("artist", ParamType.STRING, "The artist, for a song or album.", required = false),
+                Param("app", ParamType.STRING, "A music app to play it in.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "alarms", "Tell when the next alarm is, show the alarms, or turn one off.",
+            listOf(
+                Param("action", ParamType.STRING, "What to do.", options = listOf("next", "show", "cancel")),
+                Param("hour", ParamType.INTEGER, "The alarm's hour (0-23), to turn off a particular one.", required = false),
+                Param("minute", ParamType.INTEGER, "Its minute.", required = false),
+                Param("ambiguous", ParamType.STRING, "true when am or pm wasn't said.", required = false, options = listOf("true", "false")),
+            ),
+        ),
+        ToolSpec(
+            "timers", "Tell how long is left on a timer, or show or cancel the timers.",
+            listOf(Param("action", ParamType.STRING, "What to do.", options = listOf("check", "show", "cancel"))),
+        ),
+        ToolSpec(
+            "reminders", "List the reminders, or cancel one or all of them.",
+            listOf(
+                Param("action", ParamType.STRING, "What to do.", options = listOf("list", "cancel")),
+                Param("which", ParamType.STRING, "Words from the reminder to cancel, or all.", required = false),
+            ),
+        ),
+        ToolSpec(
+            "call_log", "Tell who called: missed or recent calls.",
+            listOf(Param("filter", ParamType.STRING, "Which calls.", required = false, options = listOf("missed", "recent"))),
+        ),
+        ToolSpec("call_back", "Call back the last person who called. The user confirms first."),
+        ToolSpec(
+            "remember", "Remember a fact about the user for later.",
+            listOf(Param("fact", ParamType.STRING, "What to remember.")),
+        ),
+        ToolSpec(
+            "forget", "Forget something remembered, or everything.",
+            listOf(Param("what", ParamType.STRING, "Words from what to forget, or all.")),
+        ),
+        ToolSpec("recall", "Say what Shuttle remembers about the user."),
         ToolSpec("battery_status", "Report the battery level and whether the phone is charging."),
         ToolSpec(
             "web_search", "Search the web and read the top results.",

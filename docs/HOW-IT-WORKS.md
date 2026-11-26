@@ -112,8 +112,8 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   in a moment. Loading and restoring start as soon as Shuttle has drawn its first frame (not
   before, so the screen isn't slowed down), and a question only has to read its own words. The instructions never change, so the saved copy stays valid; the date
   goes in a separate short note after them. The model's memory (about 3 GB) is freed after ten
-  quiet minutes. The context is capped at 10,000 tokens: the instructions and tool list take
-  about 3,000, the rest is for the chat and the reply. Replies can run to about 1,000
+  quiet minutes. The context is capped at 12,000 tokens: the instructions and tool list take
+  about 3,500, the rest is for the chat, shared text and the reply. Replies can run to about 1,000
   tokens. Sampling is gentle (temperature 0.3, with min-p and a light repeat penalty so a
   small model doesn't loop through the same list item).
 - **Stopping.** Stop asks the native code to abort, which llama.cpp checks during every step of
@@ -209,6 +209,27 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   selfie or video; a contact's number, email, address or birthday; an email started in the
   email app; a note sent to the notes app (the only notes-like app that takes shared text, or
   the share sheet).
+- **Music** (`tools/Music.kt`): Android's "play from search" request with what kind of thing
+  it is (artist, album, song, playlist, genre), to the named app or the default player.
+- **Alarms and timers** (`tools/Clock.kt`): the next alarm comes from Android (the time the
+  clock app registered); showing and turning off go to the clock app. Timers Shuttle starts
+  are kept with their end time (`TimerLog`) to say what's left; a running timer can't be
+  stopped by an app, so cancelling opens the clock's timers. Reminders (Shuttle's own) can be
+  listed and cancelled (`tools/Reminders.kt`).
+- **Call history** (`tools/CallHistory.kt`): missed and recent calls from the call log; "call
+  them back" hands the last caller's number to the call tool, which confirms first.
+- **Memory** (`engine/Memory.kt`, `tools/MemoryTools.kt`): facts the user asked to remember,
+  in private storage. They go in the per-question note, so changing them never makes the
+  model re-read its instructions, and any contact in a command is first looked up in them
+  ("my wife" → Sam).
+- **Routines** (`engine/Routines.kt`, `RoutineStore` in `tools/MemoryTools.kt`): a phrase
+  ("good night", or "run my good night routine") runs its lines through the same parser, one
+  after another; lines it doesn't understand are skipped and reported.
+- **Sharing in** (`MainActivity`, `ui/ChatScreen.kt`'s `SharedCard`): Shuttle is a share target
+  for text. The shared item waits above the chat; a button or a typed question sends it to
+  the model with the instruction (up to about 8,000 characters). A link is fetched and its
+  readable text taken first (`search/PageText.kt`). What was shared goes with follow-ups in
+  the same session but isn't saved with the chat.
 - **Instant answers** (`engine/InstantAnswers.kt`): arithmetic, unit conversions and the time
   in other places, answered before the model (which is slower and can get sums wrong). Only
   a question it fully understands is answered there.
@@ -303,6 +324,12 @@ timers are created in your own clock app, which rings them.
 | `tools/Messages.kt` | Reading notifications and replying to messages; the notification listener |
 | `tools/WeatherTool.kt` | Fetching the weather; the phone's approximate location |
 | `tools/Shortcuts.kt` | Settings pages, App info, camera, contact details, email, notes |
+| `tools/Music.kt` | Playing music by name |
+| `tools/CallHistory.kt` | Missed and recent calls; calling back |
+| `tools/MemoryTools.kt` | Remembered facts and routines, kept on the phone |
+| `engine/Memory.kt` | Facts for the model; "my wife" → a name |
+| `engine/Routines.kt` | Matching a routine's phrase; its lines as commands |
+| `search/PageText.kt` | The readable text of a shared link's page |
 | `engine/When.kt` | Days and times as said, for reminders and events |
 | `engine/InstantAnswers.kt` | Arithmetic, unit conversions, time elsewhere |
 | `engine/Weather.kt` | National Weather Service and MET Norway answers; the weather report |

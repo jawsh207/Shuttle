@@ -44,6 +44,7 @@ enum class Access(val label: String, val permissions: List<String>) {
     NEARBY_DEVICES("Nearby devices (Bluetooth)", listOf("android.permission.BLUETOOTH_CONNECT")),
     MICROPHONE("Microphone", listOf("android.permission.RECORD_AUDIO")),
     CALENDAR("Calendar", listOf("android.permission.READ_CALENDAR")),
+    CALL_LOG("Call history", listOf("android.permission.READ_CALL_LOG")),
     LOCATION("Approximate location", listOf("android.permission.ACCESS_COARSE_LOCATION")),
     NOTIFY("Notifications", listOf("android.permission.POST_NOTIFICATIONS")),
     DO_NOT_DISTURB("Do Not Disturb access", emptyList()),

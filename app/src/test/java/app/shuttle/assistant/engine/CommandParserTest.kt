@@ -311,6 +311,45 @@ class CommandParserTest {
         check("go ahead and search", call("web_search", "query" to "it"))
     }
 
+    @Test fun playMusic() {
+        check("play Radiohead", call("play_music", "query" to "Radiohead", "kind" to "any"))
+        check("play Karma Police by Radiohead", call("play_music", "query" to "Karma Police", "kind" to "song", "artist" to "Radiohead"))
+        check("play the album OK Computer", call("play_music", "query" to "OK Computer", "kind" to "album"))
+        check("play my running playlist", call("play_music", "query" to "running", "kind" to "playlist"))
+        check("play songs by Taylor Swift on Spotify", call("play_music", "query" to "Taylor Swift", "kind" to "artist", "app" to "Spotify"))
+        check("play some jazz music", call("play_music", "query" to "jazz", "kind" to "genre"))
+        check("listen to Bon Iver", call("play_music", "query" to "Bon Iver", "kind" to "any"))
+        check("play music", call("media", "action" to "play"))
+        check("play the next song", call("media", "action" to "next"))
+        check("play it again", call("media", "action" to "previous"))
+    }
+
+    @Test fun clockAndReminderManagement() {
+        check("when is my next alarm", call("alarms", "action" to "next"))
+        check("what alarms do I have", call("alarms", "action" to "next"))
+        check("show my alarms", call("alarms", "action" to "show"))
+        check("cancel my 7am alarm", call("alarms", "action" to "cancel", "hour" to "7", "minute" to "0"))
+        check("turn off my alarm", call("alarms", "action" to "cancel"))
+        check("how much time is left on my timer", call("timers", "action" to "check"))
+        check("cancel the timer", call("timers", "action" to "cancel"))
+        check("what reminders do I have", call("reminders", "action" to "list"))
+        check("cancel the reminder to call Mom", call("reminders", "action" to "cancel", "which" to "call Mom"))
+        check("delete all my reminders", call("reminders", "action" to "cancel", "which" to "all"))
+    }
+
+    @Test fun callsAndMemory() {
+        check("who called", call("call_log", "filter" to "missed"))
+        check("any missed calls", call("call_log", "filter" to "missed"))
+        check("show my recent calls", call("call_log", "filter" to "recent"))
+        check("call them back", call("call_back"))
+        check("return the last call", call("call_back"))
+        check("remember that my wife's name is Sam", call("remember", "fact" to "My wife's name is Sam"))
+        check("remember my gym locker is 214", call("remember", "fact" to "My gym locker is 214"))
+        check("what do you remember about me", call("recall"))
+        check("forget my gym locker", call("forget", "what" to "my gym locker"))
+        check("forget everything", call("forget", "what" to "all"))
+    }
+
     @Test fun reminders() {
         check("remind me to call Mom at 6", call("set_reminder", "text" to "call Mom", "when" to "at 6"))
         check("remind me to take out the trash tomorrow at 8", call("set_reminder", "text" to "take out the trash", "when" to "tomorrow at 8"))
@@ -424,8 +463,6 @@ class CommandParserTest {
         check("who won the game last night", null)
         check("call me later", null)
         check("call it a day", null)
-        check("play Taylor Swift", null)
-        check("stop the alarm", null)
         check("", null)
     }
 

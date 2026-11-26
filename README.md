@@ -45,6 +45,11 @@ nothing is sent anywhere.
 | Media | "play", "pause the music", "next track", "volume up", "set volume to 30" |
 | Calls and texts | "call Mom", "dial 555 123 4567", "text Sam saying I'm running late" |
 | Clock | "set an alarm for 7:30", "wake me up at quarter to 7", "timer 10 minutes", "remind me in 5 minutes" |
+| Music | "play Radiohead", "play Karma Police by Radiohead", "play the album OK Computer", "play my running playlist on Spotify", "play some jazz" |
+| Alarms, timers and reminders | "when is my next alarm?", "cancel my 7am alarm", "how long is left on my timer?", "what reminders do I have?", "cancel the reminder to call Mom" |
+| Calls | "who called?", "any missed calls?", "show my recent calls", "call them back" |
+| Memory | "remember my wife's name is Sam" (then "text my wife…"), "what do you remember?", "forget my gym code" |
+| Routines | your own phrases, set up in Settings › Routines ("good night" → Do Not Disturb on, brightness 10%, alarm at 7) |
 | Reminders | "remind me to call Mom at 6", "remind me tomorrow to take out the trash", "remind me in 20 minutes to check the oven" |
 | Calendar | "what's on my calendar today?", "what do I have Friday?", "am I free next Monday?", "add dentist to my calendar Friday at 3" |
 | Messages | "read my notifications", "any new messages?", "what did Sam say?", "reply to Sam saying on my way" |
@@ -191,6 +196,34 @@ sends them, after you confirm. With access off (or no message to reply to), "rep
 saying…" sends a text instead. As with phone control, Android may first ask you to **Allow
 restricted settings** in Shuttle's App info.
 
+### Sharing into Shuttle
+
+Share text or a link from any app (**Share › Ask Shuttle**). It waits at the top of the chat
+with **Summarize**, **Key points**, **Explain** and **Translate**, or type your own question
+about it. A link is opened and its article read first (the Network permission is needed for
+that). Needs the downloaded model.
+
+### Music, alarms, timers and calls
+
+- **Music** uses Android's standard "play from search" request, so your music player finds
+  and plays it; name the app to choose one ("…on Spotify"). Players that don't support the
+  request can only be paused, resumed and skipped.
+- **Alarms** belong to your clock app, which doesn't share its list: Shuttle can tell when
+  the next one rings, show them, and ask the clock app to turn one off (it may ask you to
+  confirm).
+- **Timers:** Shuttle knows how long is left on timers it started. Android gives apps no way
+  to stop a running timer, so "cancel the timer" opens the clock's timers for you to tap.
+- **Call history** needs the Call logs permission. "Call them back" calls the last person who
+  rang, after you confirm.
+
+### Memory and routines
+
+- **Memory:** "remember…" keeps a fact on the phone; the model sees them with each question,
+  and people named by relation ("my wife", "Mom") become the names you gave. Settings › Memory
+  lists them to delete.
+- **Routines:** Settings › Routines: a phrase, and the commands it runs, one per line, written
+  as you'd say them. Lines Shuttle doesn't understand are pointed out.
+
 ### Weather, reminders and the calendar
 
 - **Weather** comes from the US [National Weather Service](https://www.weather.gov/) for
@@ -226,6 +259,7 @@ Settings (the gear in the chat's search bar) lets you grant things ahead of time
 | Phone control (optional accessibility service) | Tapping Quick Settings tiles for switches apps can't change; screenshots, lock, home and other phone actions |
 | Notification access (optional, special) | Reading notifications and replying to messages, when asked |
 | Calendar | "What's on my calendar?" |
+| Call logs | "Who called?" and "call them back" |
 | Approximate location | The weather where you are, when no place is named |
 | Notifications (Android 13+) | Showing reminders (and the model download's progress) |
 | Alarms and reminders (exact alarms, granted at install) | Reminders on time; set again after a restart |

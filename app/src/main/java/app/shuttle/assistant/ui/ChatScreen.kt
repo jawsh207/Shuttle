@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import app.shuttle.assistant.search.PageText
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -98,6 +99,8 @@ fun ChatScreen(
     var chats by remember { mutableStateOf(emptyList<ChatStore.Chat>()) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // Something was just shared to Shuttle: show the chat, where it's waiting.
+    LaunchedEffect(vm.shared) { if (vm.shared != null) query = null }
     // Back from the chat list or search returns to the chat; only from there does it leave
     // the app. (Settings, drawn over this, handles its own back first.)
     BackHandler(enabled = query != null) { query = null }
@@ -163,21 +166,26 @@ fun ChatScreen(
                 onDelete = { confirmDelete = it },
             )
         } else {
-            AssistantPanel(
-                vm = vm,
-                onClose = {},
-                voice = voice,
-                speakReplies = speakReplies,
-                fullScreen = true,
-                focusOnOpen = false,
-                empty = { send -> Welcome(send) },
-                modifier = Modifier
+            Column(
+                Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .consumeWindowInsets(padding)
                     .imePadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-            )
+            ) {
+                vm.shared?.let { SharedCard(vm, it) }
+                AssistantPanel(
+                    vm = vm,
+                    onClose = {},
+                    voice = voice,
+                    speakReplies = speakReplies,
+                    fullScreen = true,
+                    focusOnOpen = false,
+                    empty = { send -> Welcome(send) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -407,6 +415,57 @@ private fun SearchBarPill(
                     LaunchedEffect(Unit) { focus.requestFocus() }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Text or a link shared into Shuttle, waiting above the chat: one tap to summarize, list
+ * the key points, explain or translate it, or a question typed below. The ✕ drops it.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SharedCard(vm: AssistantViewModel, item: AssistantViewModel.Shared) {
+    val context = LocalContext.current
+    val language = remember { java.util.Locale.getDefault().displayLanguage.ifBlank { "English" } }
+    val actions = listOf(
+        "Summarize" to "Summarize this in a short paragraph.",
+        "Key points" to "List the key points of this as short bullets.",
+        "Explain" to "Explain this in simple terms.",
+        "Translate" to "Translate this into $language.",
+    )
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+    ) {
+        Column(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (PageText.isLink(item.text)) "Shared link" else "Shared text",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { vm.dropShared() }) { Icon(Icons.Rounded.Close, contentDescription = "Dismiss") }
+            }
+            Text(
+                item.subject?.let { "$it\n${item.text}" } ?: item.text,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp, end = 12.dp)) {
+                for ((label, instruction) in actions) {
+                    SuggestionChip(onClick = { vm.askShared(context, instruction, label = label) }, label = { Text(label) })
+                }
+            }
+            Text(
+                "Or ask your own question about it below.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

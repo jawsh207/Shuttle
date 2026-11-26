@@ -4,4 +4,5 @@
     <string name="quick_tiles_label">Shuttle phone control</string>
     <string name="messages_label">Shuttle messages</string>
     <string name="quick_tiles_description">Lets Shuttle switch Quick Settings tiles for you (it opens Quick Settings, taps the tile you named and closes it again), and take a screenshot, lock the phone, or go home, back or to recent apps when you ask. It only looks at the system\'s own screens (the status bar and Quick Settings), only while doing what you asked, and nothing it sees is saved or sent anywhere.</string>
+    <string name="share_label">Ask Shuttle</string>
 </resources>

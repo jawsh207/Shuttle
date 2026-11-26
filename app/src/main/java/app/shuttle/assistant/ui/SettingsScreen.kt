@@ -29,6 +29,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.ui.text.style.TextOverflow
+import app.shuttle.assistant.tools.RoutineStore
+import app.shuttle.assistant.tools.MemoryStore
+import app.shuttle.assistant.engine.Routines
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -95,6 +101,8 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
     var specialOpen by rememberSaveable { mutableStateOf(true) }
     var chatsOpen by rememberSaveable { mutableStateOf(true) }
     var modelOpen by rememberSaveable { mutableStateOf(true) }
+    var routinesOpen by rememberSaveable { mutableStateOf(false) }
+    var memoryOpen by rememberSaveable { mutableStateOf(false) }
     var confirmDeleteModel by rememberSaveable { mutableStateOf(false) }
     if (confirmDeleteModel) {
         AlertDialog(
@@ -168,6 +176,10 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
 
                 ModelSection(modelOpen, onToggle = { modelOpen = !modelOpen }, onDelete = { confirmDeleteModel = true }) { refresh++ }
 
+                RoutinesSection(routinesOpen) { routinesOpen = !routinesOpen }
+
+                MemorySection(memoryOpen) { memoryOpen = !memoryOpen }
+
                 val runtime = buildList {
                     add(Access.CONTACTS to "Find people by name for calls and texts.")
                     add(Access.PHONE to "Place calls you've confirmed.")
@@ -176,6 +188,7 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                         add(Access.NEARBY_DEVICES to "Ask to turn on Bluetooth.")
                     }
                     add(Access.CALENDAR to "Tell you what's on your calendar.")
+                    add(Access.CALL_LOG to "Tell you who called, and call them back.")
                     add(Access.LOCATION to "The weather where you are, when you don't name a place.")
                     if (Build.VERSION.SDK_INT >= 33) add(Access.NOTIFY to "Show reminders.")
                 }
@@ -289,6 +302,133 @@ fun SettingsScreen(chatPrefs: ChatPrefs, onDeleteAllChats: () -> Unit, onBack: (
                 }
             }
         }
+    }
+}
+
+/**
+ * Routines: a phrase and the commands it runs, one per line. Lines Shuttle doesn't understand
+ * are pointed out when saving (and skipped when run).
+ */
+@Composable
+private fun RoutinesSection(expanded: Boolean, onToggle: () -> Unit) {
+    val context = LocalContext.current
+    var routines by remember { mutableStateOf(RoutineStore.all(context)) }
+    var editing by remember { mutableStateOf<Int?>(null) } // index, or -1 for a new one
+    fun save(list: List<Routines.Routine>) {
+        routines = list
+        RoutineStore.save(context, list)
+    }
+    Section(
+        "Routines",
+        summary = if (routines.isEmpty()) "None yet" else routines.joinToString(", ") { it.phrase },
+        expanded = expanded,
+        onToggle = onToggle,
+    ) {
+        Text(
+            "Say a phrase to run several commands at once, like \"good night\" turning on Do Not Disturb and setting an alarm.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        routines.forEachIndexed { i, r ->
+            Card(
+                onClick = { editing = i },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("\"${r.phrase}\"", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            r.commands.joinToString(" · "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(onClick = { save(routines.filterIndexed { j, _ -> j != i }) }) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Delete ${r.phrase}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        FilledTonalButton(onClick = { editing = -1 }) { Text("Add a routine") }
+    }
+    editing?.let { index ->
+        val existing = routines.getOrNull(index)
+        var phrase by remember(index) { mutableStateOf(existing?.phrase.orEmpty()) }
+        var commands by remember(index) { mutableStateOf(existing?.commands?.joinToString("\n").orEmpty()) }
+        val unknown = Routines.calls(Routines.Routine(phrase, Routines.lines(commands))).second
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text(if (existing == null) "New routine" else "Edit routine") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(phrase, { phrase = it }, label = { Text("When I say") }, placeholder = { Text("Good night") }, singleLine = true)
+                    OutlinedTextField(
+                        commands, { commands = it },
+                        label = { Text("Do this (one per line)") },
+                        placeholder = { Text("do not disturb on\nbrightness 10%\nset an alarm for 7am") },
+                        minLines = 4,
+                    )
+                    if (unknown.isNotEmpty()) {
+                        Text(
+                            "I won't understand: ${unknown.joinToString("; ")}. Write them as you'd say them to Shuttle.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = phrase.isNotBlank() && Routines.lines(commands).isNotEmpty(),
+                    onClick = {
+                        val routine = Routines.Routine(phrase.trim(), Routines.lines(commands))
+                        save(if (existing == null) routines + routine else routines.mapIndexed { j, r -> if (j == index) routine else r })
+                        editing = null
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** What Shuttle has been asked to remember ([MemoryStore]): each can be deleted, or all at once. */
+@Composable
+private fun MemorySection(expanded: Boolean, onToggle: () -> Unit) {
+    val context = LocalContext.current
+    var facts by remember { mutableStateOf(MemoryStore.facts(context)) }
+    fun save(list: List<String>) {
+        facts = list
+        MemoryStore.save(context, list)
+    }
+    Section("Memory", summary = if (facts.isEmpty()) "Nothing yet" else "${facts.size} remembered", expanded = expanded, onToggle = onToggle) {
+        Text(
+            "Say \"remember…\" to add something (\"remember my wife's name is Sam\"), and Shuttle uses it in answers and when " +
+                "you say \"text my wife\". Kept only on this phone.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        facts.forEachIndexed { i, fact ->
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(fact, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(vertical = 12.dp))
+                    IconButton(onClick = { save(facts.filterIndexed { j, _ -> j != i }) }) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Forget: $fact", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        if (facts.isNotEmpty()) TextButton(onClick = { save(emptyList()) }) { Text("Forget everything") }
     }
 }
 

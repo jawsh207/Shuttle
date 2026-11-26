@@ -1,5 +1,6 @@
 package app.shuttle.assistant
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -42,7 +43,9 @@ import java.io.File
  * ([app.shuttle.assistant.assist.AssistActivity]). Both run the same conversation code. This
  * chat is saved as it goes to the app's private storage ([ChatStore]), and keeps its
  * conversation across rotation and trips to other apps that a command opened. Each fresh
- * launch starts a new chat; earlier ones are behind the search bar.
+ * launch starts a new chat; earlier ones are behind the search bar. It's also a share target:
+ * text or a link shared to Shuttle waits in the chat with Summarize, Key points, Explain and
+ * Translate buttons, or a question typed about it.
  */
 class MainActivity : ComponentActivity() {
 
@@ -61,6 +64,8 @@ class MainActivity : ComponentActivity() {
         val chatPrefs = ChatPrefs(this)
         val store = ChatStore(File(filesDir, "chats"))
         vm.attach(store) { chatPrefs.saveChats }
+        // Shared from another app ("Share › Shuttle"): offer to summarize, explain or translate it.
+        if (savedInstanceState == null) takeShared(intent)
         val session = VoiceSession(this).also { voice = it }
         setContent {
             ShuttleTheme {
@@ -94,6 +99,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeShared(intent)
+    }
+
+    private fun takeShared(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return
+        vm.share(text, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: intent.getStringExtra(Intent.EXTRA_TITLE))
     }
 
     override fun onDestroy() {

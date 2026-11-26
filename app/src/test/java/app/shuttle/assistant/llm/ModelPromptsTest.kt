@@ -32,12 +32,17 @@ class ModelPromptsTest {
         // Read once per model and then saved, but the first read happens on the phone's CPU,
         // so growth should be a choice: raise this deliberately, not by accident.
         val size = ModelPrompts.prefix().length
-        // About 3K tokens: read once per model and saved, but it shares the 10K context with the chat.
-        assertTrue("prefix is $size chars", size < 12000)
+        // About 3.5K tokens: read once per model and saved, but it shares the 12K context with
+        // the chat, shared text and the reply.
+        assertTrue("prefix is $size chars", size < 13500)
     }
 
     @Test fun promptStartIsStableAndDatedOnly() {
         assertEquals("Today is Tuesday, November 24, 2026.", ModelPrompts.note(LocalDate.of(2026, 11, 24)))
+        assertEquals(
+            "Today is Tuesday, November 24, 2026. What the user asked you to remember: Likes tea.",
+            ModelPrompts.note(LocalDate.of(2026, 11, 24), "What the user asked you to remember: Likes tea."),
+        )
         assertTrue(!ModelPrompts.prefix().contains("Today is"))
         val full = GranitePrompt.build(
             ModelPrompts.system(), ModelPrompts.tools, listOf(GranitePrompt.Message(GranitePrompt.Role.USER, "hi")),

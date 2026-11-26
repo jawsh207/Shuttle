@@ -51,6 +51,20 @@ object WebSearch {
         return (web.take(5) + wiki).distinctBy { it.url }
     }
 
+    /**
+     * A shared link's readable text ([PageText]). Throws [Blocked] when the network permission
+     * is off; an empty page when the site sent nothing readable.
+     */
+    fun page(url: String): PageText.Page {
+        val (code, html) = try {
+            get(url)
+        } catch (e: IOException) {
+            if (blocked(e)) throw Blocked() else throw e
+        }
+        if (code !in 200..299) throw IOException("The page answered $code")
+        return PageText.read(html.take(2_000_000))
+    }
+
     private fun blocked(e: IOException) =
         e is UnknownHostException || (e is SocketException && (e.message?.contains("EACCES") == true || e.message?.contains("Permission denied") == true))
 

@@ -353,7 +353,65 @@ object CommandParser {
 
     private fun phoneAction(a: String) = ToolCall("phone_action", mapOf("action" to a))
 
+    /** Words that mean "the music", not a name to search for. */
+    private val notAName = Regex("(?i)(?:it|that|this|something|anything|music|a song|some music|the radio|the next one|again)")
+
+    private fun music(query: String, kind: String, artist: String, app: String): ToolCall? {
+        val q = query.trim().trimEnd('.', '!').removePrefix("some ").trim()
+        if (q.isEmpty() || notAName.matches(q)) return null
+        return ToolCall("play_music", buildMap {
+            put("query", q)
+            put("kind", kind)
+            artist.trim().takeIf { it.isNotEmpty() }?.let { put("artist", it) }
+            app.trim().takeIf { it.isNotEmpty() }?.let { put("app", it) }
+        })
+    }
+
+    private fun alarmsCall(action: String, timeText: String? = null): ToolCall? {
+        val clock = timeText?.takeIf { it.isNotBlank() }?.let { Quantities.parseClock(it) ?: return null }
+        return ToolCall("alarms", buildMap {
+            put("action", action)
+            clock?.let {
+                put("hour", it.hour.toString())
+                put("minute", it.minute.toString())
+                if (!it.meridiemGiven) put("ambiguous", "true")
+            }
+        })
+    }
+
     private fun assistantRules(): List<Rule> = buildList {
+        // Alarms, timers and reminders: checking and cancelling (setting is further down).
+        val my = "(?:my\\s+|the\\s+)?"
+        add(Rule("(?:what|which)\\s+alarms?\\s+(?:do\\s+i\\s+have|are\\s+(?:set|on))(?:\\s+set)?|(?:when|what\\s+time)\\s+is\\s+my\\s+(?:next\\s+)?alarm(?:\\s+set\\s+for)?|(?:is|are)\\s+(?:there\\s+)?(?:an?\\s+|any\\s+)?alarms?\\s+(?:set|on)|(?:my\\s+)?next\\s+alarm|do\\s+i\\s+have\\s+(?:an?\\s+|any\\s+)?alarms?(?:\\s+set)?(?:\\s+(?:for\\s+)?(?:tomorrow|tonight))?") { alarmsCall("next") })
+        add(Rule("(?:show|open|list|see)\\s+(?:me\\s+)?$my(?:all\\s+)?alarms|(?:my|all)\\s+alarms") { alarmsCall("show") })
+        add(Rule("(?:cancel|delete|remove|turn\\s+off|disable|dismiss|stop|skip|clear)\\s+$my(?:next\\s+)?(?:(.+?)\\s+)?alarm(?:\\s+(?:for|at)\\s+(.+))?") { m ->
+            val time = m.groupValues[1].ifBlank { m.groupValues[2] }
+            if (time.isBlank()) alarmsCall("cancel") else alarmsCall("cancel", time.removePrefix("the "))
+        })
+        add(Rule("(?:how\\s+(?:much|long)\\s+(?:time\\s+)?(?:is\\s+)?(?:left|remaining)(?:\\s+on\\s+(?:my|the)\\s+timer)?|how\\s+long\\s+until\\s+(?:my|the)\\s+timer(?:\\s+(?:goes\\s+off|ends|is\\s+done|rings))?|(?:check|what's|whats|what\\s+is)\\s+(?:on\\s+)?$my\\s*timers?|time\\s+left(?:\\s+on\\s+(?:my|the)\\s+timer)?)") { ToolCall("timers", mapOf("action" to "check")) })
+        add(Rule("(?:show|open|see)\\s+(?:me\\s+)?$my\\s*timers?") { ToolCall("timers", mapOf("action" to "show")) })
+        add(Rule("(?:cancel|stop|delete|remove|end|clear|turn\\s+off|dismiss|kill)\\s+$my(?:all\\s+(?:my\\s+|the\\s+)?)?timers?") { ToolCall("timers", mapOf("action" to "cancel")) })
+        add(Rule("(?:what|which)\\s+reminders\\s+(?:do\\s+i\\s+have|are\\s+set)|(?:show|list|read|check|what\\s+are)\\s+(?:me\\s+)?$my\\s*reminders|(?:my|any)\\s+reminders|do\\s+i\\s+have\\s+any\\s+reminders") { ToolCall("reminders", mapOf("action" to "list")) })
+        add(Rule("(?:cancel|delete|remove|clear)\\s+(?:all\\s+)?(?:of\\s+)?$my\\s*reminders", verbatim = true) { ToolCall("reminders", mapOf("action" to "cancel", "which" to "all")) })
+        add(Rule("(?:cancel|delete|remove|clear|forget)\\s+(?:my\\s+|the\\s+)?reminder\\s+(?:to\\s+|about\\s+|for\\s+)?(.+)", verbatim = true) { m ->
+            ToolCall("reminders", mapOf("action" to "cancel", "which" to m.groupValues[1].trim()))
+        })
+        add(Rule("(?:cancel|delete|remove|clear)\\s+(?:my\\s+|the\\s+)?(?:last\\s+|latest\\s+|next\\s+)?reminder") { ToolCall("reminders", mapOf("action" to "cancel", "which" to "next")) })
+
+        // Call history.
+        add(Rule("who\\s+(?:just\\s+)?(?:called|rang|was\\s+calling|tried\\s+to\\s+call)(?:\\s+me)?(?:\\s+(?:today|earlier|just\\s+now|last))?|(?:(?:any|did\\s+i\\s+(?:have|get|miss)\\s+any|do\\s+i\\s+have\\s+any)\\s+|show\\s+(?:me\\s+)?(?:my\\s+)?|check\\s+(?:my\\s+)?)?missed\\s+calls?|did\\s+(?:i\\s+miss\\s+(?:a|any)\\s+calls?|anyone\\s+call(?:\\s+me)?)") { ToolCall("call_log", mapOf("filter" to "missed")) })
+        add(Rule("(?:show|read|check|what\\s+are)\\s+(?:me\\s+)?(?:my\\s+)?(?:recent\\s+calls|call\\s+(?:log|history))|(?:recent\\s+calls|call\\s+(?:log|history))") { ToolCall("call_log", mapOf("filter" to "recent")) })
+        add(Rule("(?:call|ring|phone)\\s+(?:them|him|her|that\\s+(?:number|person))\\s+back|call\\s+back|return\\s+(?:the|that|my)\\s+(?:last\\s+|missed\\s+)?call|call\\s+(?:back\\s+)?(?:the\\s+)?(?:last|missed)\\s+(?:caller|number|call)") { ToolCall("call_back", emptyMap()) })
+
+        // Memory.
+        add(Rule("(?:what|tell\\s+me\\s+what)\\s+do\\s+you\\s+(?:remember|know)(?:\\s+about\\s+me)?|what\\s+have\\s+i\\s+told\\s+you(?:\\s+to\\s+remember)?|what\\s+did\\s+i\\s+ask\\s+you\\s+to\\s+remember|(?:show|list)\\s+(?:me\\s+)?(?:your\\s+|my\\s+)?memor(?:y|ies)") { ToolCall("recall", emptyMap()) })
+        add(Rule("forget\\s+(?:everything|all)(?:\\s+(?:you\\s+know|i\\s+told\\s+you))?(?:\\s+about\\s+me)?|(?:clear|erase|wipe)\\s+(?:your\\s+|my\\s+)?memor(?:y|ies)") { ToolCall("forget", mapOf("what" to "all")) })
+        add(Rule("forget\\s+(?:that\\s+|about\\s+)?(.+)", verbatim = true) { m -> ToolCall("forget", mapOf("what" to m.groupValues[1].trim())) })
+        add(Rule("(?:please\\s+)?(?:remember|keep\\s+in\\s+mind|don't\\s+forget)\\s+that\\s+(.+)|(?:please\\s+)?remember\\s+(?!to\\b)(.+)", verbatim = true) { m ->
+            val fact = m.groupValues.drop(1).first { it.isNotBlank() }.trim().trimEnd('.')
+            ToolCall("remember", mapOf("fact" to fact.replaceFirstChar { it.uppercase() }))
+        })
+
         // Reminders (before timers: "remind me in 5 minutes to stretch" has a message).
         val remind = "(?:remind|ping|tell)\\s+me"
         add(Rule("$remind\\s+(?:to\\s+|about\\s+|that\\s+)(.+?)\\s+($WHEN)", verbatim = true) { reminder(it.groupValues[1], it.groupValues[2]) })
@@ -560,6 +618,17 @@ object CommandParser {
         add(Rule("(?:skip|go|jump)\\s+(?:to\\s+)?(?:the\\s+)?next(?:\\s+(?:one|song|track))?|play\\s+(?:the\\s+)?next(?:\\s+(?:one|song|track))?|(?:change|switch)\\s+(?:the\\s+)?(?:song|track)|(?:new|different|another)\\s+song") { media("next") })
         add(Rule("previous(?:\\s+(?:one|song|track))?|(?:last|previous)\\s+(?:one|song|track)|play\\s+(?:the\\s+)?(?:previous|last)(?:\\s+(?:one|song|track))?") { media("previous") })
         add(Rule("(?:go|skip|jump)\\s+back(?:\\s+(?:a|one))?(?:\\s+(?:song|track))?|(?:back|rewind)\\s+(?:a|one)\\s+(?:song|track)") { media("previous") })
+
+        // Playing something by name, after the plain play/pause/skip rules above.
+        val onApp = "(?:\\s+(?:on|in|with|using)\\s+([\\w .'-]{2,30}?))?"
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:the\\s+)?(?:song|track)\\s+(.+?)\\s+by\\s+(.+?)$onApp", verbatim = true) { music(it.groupValues[1], "song", it.groupValues[2], it.groupValues[3]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:the\\s+)?album\\s+(.+?)(?:\\s+by\\s+(.+?))?$onApp", verbatim = true) { music(it.groupValues[1], "album", it.groupValues[2], it.groupValues[3]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:the\\s+|my\\s+)?playlist\\s+(.+?)$onApp", verbatim = true) { music(it.groupValues[1], "playlist", "", it.groupValues[2]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:the\\s+|my\\s+)?(.+?)\\s+playlist$onApp", verbatim = true) { music(it.groupValues[1], "playlist", "", it.groupValues[2]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:some\\s+)?(?:songs|music|something|tracks|stuff)\\s+(?:by|from)\\s+(.+?)$onApp", verbatim = true) { music(it.groupValues[1], "artist", "", it.groupValues[2]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(?:some\\s+)?(.+?)\\s+(?:music|songs)$onApp", verbatim = true) { music(it.groupValues[1], "genre", "", it.groupValues[2]) })
+        add(Rule("(?:play|listen\\s+to|put\\s+on)\\s+(.+?)\\s+by\\s+(.+?)$onApp", verbatim = true) { music(it.groupValues[1], "song", it.groupValues[2], it.groupValues[3]) })
+        add(Rule("(?:play|listen\\s+to)\\s+(?:some\\s+)?(.+?)$onApp", verbatim = true) { music(it.groupValues[1], "any", "", it.groupValues[2]) })
 
         // Timers before alarms: "wake me up in 20 minutes" is a countdown.
         add(Rule("(?:set|start|create|make|add|put|run)\\s+(?:an?\\s+|the\\s+|my\\s+)?(?:timer|countdown|count down)\\s+(?:for\\s+|of\\s+|to\\s+)?(.+)") { timer(it.groupValues[1]) })

@@ -36,7 +36,37 @@ internal object Reminders {
     private const val CHANNEL = "reminders"
     private const val PREFS = "reminders"
 
-    val runners: Map<String, Runner> = mapOf("set_reminder" to ::set)
+    val runners: Map<String, Runner> = mapOf("set_reminder" to ::set, "reminders" to ::manage)
+
+    /** "What reminders do I have?", "cancel the reminder to call Mom", "delete all my reminders". */
+    private fun manage(context: Context, call: ToolCall): ToolResult {
+        val now = System.currentTimeMillis()
+        val all = saved(context).filter { it.at > now }.sortedBy { it.at }
+        fun whenOf(r: Saved) = describe(context, LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(r.at), ZoneId.systemDefault()))
+        if (call.arg("action") != "cancel") {
+            if (all.isEmpty()) return ToolResult.Done("You have no reminders.")
+            return ToolResult.Done(
+                (if (all.size == 1) "One reminder:\n" else "${all.size} reminders:\n") +
+                    all.joinToString("\n") { "- **${whenOf(it).replaceFirstChar { c -> c.uppercase() }}:** ${it.text}" },
+            )
+        }
+        val which = call.arg("which") ?: "next"
+        val chosen = when (which.lowercase()) {
+            "all", "everything" -> all
+            "next", "last", "latest", "it", "that" -> all.take(1)
+            else -> app.shuttle.assistant.engine.Memory.matching(all.map { it.text }, which).let { texts -> all.filter { it.text in texts } }
+        }
+        if (chosen.isEmpty()) return ToolResult.Done(if (all.isEmpty()) "You have no reminders." else "I couldn't find a reminder about $which.")
+        val alarms = context.getSystemService(AlarmManager::class.java)
+        for (r in chosen) {
+            alarms.cancel(intent(context, r.id, r.text))
+            forget(context, r.id)
+        }
+        return ToolResult.Done(
+            if (chosen.size == 1) "Cancelled the reminder to ${chosen.first().text.replaceFirstChar { it.lowercase() }} (${whenOf(chosen.first())})."
+            else "Cancelled ${chosen.size} reminders.",
+        )
+    }
 
     private fun set(context: Context, call: ToolCall): ToolResult {
         val text = call.arg("text") ?: return ToolResult.Failed("What should I remind you about?")

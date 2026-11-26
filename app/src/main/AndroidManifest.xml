@@ -21,6 +21,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "What's on my calendar?" (asked for the first time it's needed). -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- "Who called?" and "call them back" (asked for the first time it's needed). -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <!-- The weather where you are, only when no place is named (asked for when first needed). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Reminders ring on time. Android 12 asks for the first; 13+ grants the second to
@@ -52,6 +54,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
         </intent>
+        <!-- Music players that can play something by name ("play Radiohead"). -->
+        <intent>
+            <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        </intent>
         <!-- Notes: the apps that can take shared text, to send "add milk to my list" to a notes app. -->
         <intent>
             <action android:name="android.intent.action.SEND" />
@@ -79,10 +85,17 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Share text or a link to Shuttle to summarize, explain or translate it. -->
+            <intent-filter android:label="@string/share_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

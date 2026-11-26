@@ -72,6 +72,7 @@ object ModelPrompts {
             "open_app", "navigate", "battery_status", "date_time",
             "weather", "set_reminder", "calendar_events", "add_event", "read_notifications", "reply_message",
             "phone_action", "open_settings", "camera", "contact_info", "send_email", "add_note",
+            "play_music", "reminders", "call_log",
         )
         keep.forEach { name -> add(shorter[name] ?: ToolSchemas.find(name)!!) }
         add(
@@ -119,9 +120,13 @@ object ModelPrompts {
             "You don't know exactly when your training data ends, so never state a cutoff date or year; " +
             "if asked, say you can't tell exactly and that recent events may be missing."
 
-    /** The date, sent after the shared start so the start never changes. */
-    fun note(today: LocalDate = LocalDate.now()): String =
-        "Today is " + today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)) + "."
+    /**
+     * The date and what the user asked Shuttle to remember (`engine/Memory.kt`), sent after the
+     * shared start so the start never changes.
+     */
+    fun note(today: LocalDate = LocalDate.now(), memory: String = ""): String =
+        "Today is " + today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)) + "." +
+            if (memory.isEmpty()) "" else " $memory"
 
     /** The prompt start every request shares, for [LocalModel.prepare]. */
     fun prefix(): String = GranitePrompt.systemBlock(system(), tools)

@@ -40,6 +40,9 @@ object DeviceTools {
         putAll(Messages.runners)
         putAll(PhoneActions.runners)
         putAll(Shortcuts.runners)
+        putAll(Music.runners)
+        putAll(CallHistory.runners)
+        putAll(MemoryStore.runners)
     }
 
     /**

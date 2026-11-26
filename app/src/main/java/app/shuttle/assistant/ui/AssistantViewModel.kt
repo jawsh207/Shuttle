@@ -13,6 +13,8 @@ import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.engine.CONFIRMED
 import app.shuttle.assistant.engine.CommandParser
 import app.shuttle.assistant.engine.InstantAnswers
+import app.shuttle.assistant.engine.Memory
+import app.shuttle.assistant.engine.Routines
 import app.shuttle.assistant.engine.SearchHints
 import app.shuttle.assistant.engine.SmallTalk
 import app.shuttle.assistant.engine.Source
@@ -23,10 +25,13 @@ import app.shuttle.assistant.llm.LocalModel
 import app.shuttle.assistant.llm.ModelManager
 import app.shuttle.assistant.llm.ModelPrompts
 import app.shuttle.assistant.search.SearchResult
+import app.shuttle.assistant.search.PageText
 import app.shuttle.assistant.search.SearchResults
 import app.shuttle.assistant.search.WebSearch
 import app.shuttle.assistant.tools.DeviceTools
+import app.shuttle.assistant.tools.MemoryStore
 import app.shuttle.assistant.tools.QuickTiles
+import app.shuttle.assistant.tools.RoutineStore
 import java.time.ZonedDateTime
 import java.util.concurrent.Executors
 
@@ -67,6 +72,12 @@ class AssistantViewModel : ViewModel() {
         val status: String = "",
         /** Written by the model (not a command result or a fixed reply). */
         val fromModel: Boolean = false,
+        /**
+         * What the model was actually given, when that's more than [asked] shows: shared text
+         * or a page ("Summarize: Why the sky is blue" plus the article). Kept for follow-ups in
+         * this session, not saved with the chat.
+         */
+        val fullText: String? = null,
     )
 
     /** True while the model is writing; new requests wait (or the user stops it). */
@@ -162,6 +173,24 @@ class AssistantViewModel : ViewModel() {
     fun submit(context: Context, text: String, after: (Boolean) -> Unit = {}) {
         val asked = text.trim()
         if (asked.isEmpty() || thinking) return after(false)
+        // Something shared into Shuttle is waiting: this is the question about it.
+        if (shared != null) return askShared(context, asked, after)
+        // A routine's phrase runs its commands.
+        Routines.match(asked, RoutineStore.all(context))?.let { routine ->
+            val (calls, unknown) = Routines.calls(routine)
+            if (calls.isEmpty()) {
+                exchanges += Exchange(nextId++, asked, ToolResult.Failed("The routine \"${routine.phrase}\" has no steps I understand. Edit it in Settings › Routines."))
+                persist()
+                return after(false)
+            }
+            return runCalls(context, calls, asked) { close ->
+                if (unknown.isNotEmpty()) {
+                    exchanges += Exchange(nextId++, "", ToolResult.Failed("Skipped steps I didn't understand: ${unknown.joinToString("; ")}."))
+                    persist()
+                }
+                after(close)
+            }
+        }
         val model = ModelManager.ready
         // Mid-conversation with the model, a follow-up like "continue" or "next" means "go on
         // with that answer", not a phone command, and "no"/"thanks" are replies to it.
@@ -231,15 +260,90 @@ class AssistantViewModel : ViewModel() {
         }
     }
 
+    // --- Shared text ---------------------------------------------------------------------------
+
+    /** Text or a link shared into Shuttle from another app, waiting for "summarize" or a question. */
+    data class Shared(val text: String, val subject: String?)
+
+    var shared by mutableStateOf<Shared?>(null)
+        private set
+
+    fun share(text: String, subject: String?) {
+        if (text.isNotBlank()) shared = Shared(text.trim(), subject?.trim()?.takeIf { it.isNotEmpty() })
+    }
+
+    fun dropShared() {
+        shared = null
+    }
+
+    /**
+     * Asks the model about what was shared: [instruction] is a button's ("Summarize") or the
+     * user's own question. A shared link is fetched and read first ([WebSearch.page]); text
+     * goes as it is, cut to about 8,000 characters to leave room in the model's context.
+     */
+    fun askShared(context: Context, instruction: String, after: (Boolean) -> Unit = {}, label: String = instruction) {
+        val item = shared ?: return after(false)
+        shared = null
+        val model = ModelManager.ready
+        val title = item.subject ?: item.text.lineSequence().first().take(60).let { if (it.length < item.text.length) "$it…" else it }
+        val shown = "$label: $title"
+        if (model == null) {
+            exchanges += Exchange(nextId++, shown, ToolResult.Failed("Download the model in Settings › Model to work with shared text."))
+            persist()
+            return after(false)
+        }
+        fun ask(body: String, name: String?) {
+            val full = "$instruction\n\n---\n" + (name?.let { "$it\n\n" } ?: "") + body.take(8000) + "\n---"
+            askModel(context, shown, model, after, fullText = full)
+        }
+        val link = if (PageText.isLink(item.text)) item.text else null
+        if (link == null) return ask(item.text, item.subject)
+        val reading = Exchange(nextId++, shown, ToolResult.Done(""), thinking = true, status = "Reading the page…")
+        exchanges += reading
+        thinking = true
+        background.execute {
+            val page = runCatching { WebSearch.page(link) }
+            mainThread.post {
+                exchanges.removeAll { it.id == reading.id }
+                thinking = false
+                page.fold(
+                    onSuccess = { p ->
+                        if (p.text.isBlank()) {
+                            exchanges += Exchange(nextId++, shown, ToolResult.Failed("I couldn't find readable text on that page. Try sharing the text itself."))
+                            persist()
+                            after(false)
+                        } else {
+                            ask(p.text, p.title.ifBlank { null })
+                        }
+                    },
+                    onFailure = { e ->
+                        val why = if (e is WebSearch.Blocked) "Shuttle isn't allowed to use the network. Turn on its Network permission in App info."
+                        else "I couldn't open that page (${e.message ?: "no connection"})."
+                        exchanges += Exchange(nextId++, shown, ToolResult.Failed(why))
+                        persist()
+                        after(false)
+                    },
+                )
+            }
+        }
+    }
+
     // --- The model -------------------------------------------------------------------------
 
     /**
      * Answers with the model. With [search], the web is searched first and the model answers
      * from the results; otherwise the model may ask for a search itself (once per question).
      */
-    private fun askModel(context: Context, asked: String, model: ModelManager.State.Ready, after: (Boolean) -> Unit, search: String? = null) {
-        val messages = conversation() + GranitePrompt.Message(GranitePrompt.Role.USER, asked)
-        val placeholder = Exchange(nextId++, asked, ToolResult.Done(""), thinking = true)
+    private fun askModel(
+        context: Context,
+        asked: String,
+        model: ModelManager.State.Ready,
+        after: (Boolean) -> Unit,
+        search: String? = null,
+        fullText: String? = null,
+    ) {
+        val messages = conversation() + GranitePrompt.Message(GranitePrompt.Role.USER, fullText ?: asked)
+        val placeholder = Exchange(nextId++, asked, ToolResult.Done(""), thinking = true, fullText = fullText)
         exchanges += placeholder
         thinking = true
         stopped = false
@@ -265,7 +369,7 @@ class AssistantViewModel : ViewModel() {
         sources: List<Source>,
         after: (Boolean) -> Unit,
     ) {
-        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note())
+        val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note(memory = Memory.forModel(MemoryStore.facts(context))))
         LocalModel.generate(model.file, prompt) { event ->
             when (event) {
                 is LocalModel.Event.Status -> replace(placeholderId) { it.copy(status = if (round > 0) "Reading the results…" else event.text) }
@@ -398,7 +502,7 @@ class AssistantViewModel : ViewModel() {
         // Only real answers are context. Shuttle's own notes (errors, "Stopped.", "the model
         // isn't downloaded") would just be copied into the next reply.
         fun answerOf(e: Exchange) = if (e.result is ToolResult.Failed || e.thinking || e.result.text == STOPPED) "" else e.result.text.trim()
-        fun cost(e: Exchange) = e.asked.length + answerOf(e).length
+        fun cost(e: Exchange) = (e.fullText ?: e.asked).length + answerOf(e).length
         // The window of earlier chat starts at [historyFrom] and only ever moves forward, in
         // big steps: when it outgrows the budget, the oldest turns are dropped until it's down
         // to half. Dropping one turn per question instead would change the start of the
@@ -413,7 +517,7 @@ class AssistantViewModel : ViewModel() {
         }
         val messages = ArrayList<GranitePrompt.Message>()
         for (e in window) {
-            if (e.asked.isNotBlank()) messages += GranitePrompt.Message(GranitePrompt.Role.USER, e.asked)
+            if (e.asked.isNotBlank()) messages += GranitePrompt.Message(GranitePrompt.Role.USER, e.fullText ?: e.asked)
             val answer = answerOf(e)
             if (answer.isEmpty()) continue
             val prev = messages.lastOrNull()
@@ -441,7 +545,10 @@ class AssistantViewModel : ViewModel() {
                 persist()
                 return after(close)
             }
-            val call = calls[i]
+            // "My wife" → the name a remembered fact gives ("My wife's name is Sam").
+            val call = calls[i].let { c ->
+                c.args["contact"]?.let { who -> c.with("contact", Memory.resolve(who, MemoryStore.facts(context))) } ?: c
+            }
             val askedHere = if (i == 0) firstAsked else ""
             if (QuickTiles.handles(call)) {
                 val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = "Tapping Quick Settings…")
