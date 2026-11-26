@@ -22,12 +22,12 @@ jobs:
         run: |
           set -e
           mkdir -p /tmp/geonames && cd /tmp/geonames
-          curl -sSfLO https://download.geonames.org/export/dump/cities5000.zip
+          curl -sSfLO https://download.geonames.org/export/dump/cities1000.zip
           curl -sSfLO https://download.geonames.org/export/dump/admin1CodesASCII.txt
           curl -sSfLO https://download.geonames.org/export/dump/countryInfo.txt
-          unzip -o cities5000.zip
+          unzip -o cities1000.zip
       - name: Build the place list
-        run: python3 tools/places/make_places.py /tmp/geonames/cities5000.txt /tmp/geonames/admin1CodesASCII.txt /tmp/geonames/countryInfo.txt
+        run: python3 tools/places/make_places.py /tmp/geonames/cities1000.txt /tmp/geonames/admin1CodesASCII.txt /tmp/geonames/countryInfo.txt
       - name: Commit if changed
         run: |
           git add app/src/main/assets/places

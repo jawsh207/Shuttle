@@ -5,7 +5,7 @@ import kotlin.math.round
 
 /**
  * Finding a place by name on the phone itself: "Portland", "Portland, Maine", "Paris
- * France", "Springfield IL". Reads the place list built from GeoNames (towns of 5,000+
+ * France", "Springfield IL". Reads the place list built from GeoNames (towns of 1,000+
  * people; `app/src/main/assets/places/`, made by `tools/places/make_places.py`), so a named
  * place never goes over the network; only its coordinates do, for the forecast.
  *
@@ -110,7 +110,8 @@ object Places {
             if (tab <= 0) continue
             if (line[0].lowercaseChar() !in initials && line.getOrNull(tab + 1)?.lowercaseChar() !in initials) continue
             val name = normalize(line.substring(0, tab))
-            val ascii = line.indexOf('\t', tab + 1).let { if (it > tab) normalize(line.substring(tab + 1, it)) else name }
+            // The plain-letters spelling is left empty when it's the same as the name.
+            val ascii = line.indexOf('\t', tab + 1).let { if (it > tab + 1) normalize(line.substring(tab + 1, it)) else name }
             if (name in names || ascii in names) parse(line)?.let { found += it }
         }
         fun score(p: Place) = p.population.toDouble() * (if (p.country == home) 5.0 else 1.0)

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
 Builds Shuttle's offline place list (app/src/main/assets/places/) from GeoNames
-(https://www.geonames.org, CC BY 4.0): every town of 5,000 people or more, with its region,
+(https://www.geonames.org, CC BY 4.0): every town of 1,000 people or more, with its region,
 country, coordinates, population and time zone, so "weather in Portland, Maine" needs no
 online lookup. Run by .github/workflows/places.yml, which downloads the GeoNames files:
 
-    python3 tools/places/make_places.py cities5000.txt admin1CodesASCII.txt countryInfo.txt
+    python3 tools/places/make_places.py cities1000.txt admin1CodesASCII.txt countryInfo.txt
+
+To keep the list small, the plain-letters spelling is left empty when it's the same as the
+name, and coordinates have three decimals (about 100 m, plenty for a forecast).
 """
 import os
 import sys
@@ -37,8 +40,8 @@ with open(cities_path, encoding="utf-8") as f:
         c = line.rstrip("\n").split("\t")
         name, ascii_name, lat, lon, cc, a1, pop, tz = c[1], c[2], c[4], c[5], c[8], c[10], c[14], c[17]
         rows.append("\t".join([
-            clean(name), clean(ascii_name), a1, clean(admin1.get(f"{cc}.{a1}", "")), cc,
-            f"{float(lat):.4f}", f"{float(lon):.4f}", pop or "0", tz,
+            clean(name), "" if ascii_name == name else clean(ascii_name), a1, clean(admin1.get(f"{cc}.{a1}", "")), cc,
+            f"{float(lat):.3f}".rstrip("0").rstrip("."), f"{float(lon):.3f}".rstrip("0").rstrip("."), pop or "0", tz,
         ]))
 
 # Biggest first, so a search can stop early on a strong match.
