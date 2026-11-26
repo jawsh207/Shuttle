@@ -307,7 +307,7 @@ timers are created in your own clock app, which rings them.
 | `engine/InstantAnswers.kt` | Arithmetic, unit conversions, time elsewhere |
 | `engine/Weather.kt` | National Weather Service and MET Norway answers; the weather report |
 | `engine/Places.kt` | Finding a named place in the offline place list |
-| `app/src/main/assets/places/` | The place list: towns of 5,000+ people from GeoNames, with region, country, coordinates and time zone |
+| `app/src/main/assets/places/` | The place list: towns of 1,000+ people from GeoNames, with region, country, coordinates and time zone |
 | `tools/places/make_places.py`, `.github/workflows/places.yml` | Build the place list from GeoNames and commit it (Actions › Update place list) |
 | `engine/Json.kt` | A small JSON reader (testable without Android) |
 | `engine/SettingsPages.kt` | Settings pages by name |

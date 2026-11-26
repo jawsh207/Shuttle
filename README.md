@@ -196,9 +196,9 @@ restricted settings** in Shuttle's App info.
 - **Weather** comes from the US [National Weather Service](https://www.weather.gov/) for
   places in the US, and from [MET Norway](https://api.met.no/) (the forecasts behind Yr)
   everywhere else. Both are free for any use, need no key or account, and are credited under
-  each answer. A named place is found in an offline list of 70,000 towns built from
-  [GeoNames](https://www.geonames.org/) (towns of 5,000+ people), so its name never leaves the
-  phone. With no place named, Shuttle asks once for approximate location. Either way only
+  each answer. A named place is found in an offline list of about 170,000 towns built from
+  [GeoNames](https://www.geonames.org/) (every town of 1,000+ people), so its name never
+  leaves the phone. With no place named, Shuttle asks once for approximate location. Either way only
   coordinates are sent, rounded to about a kilometre for your own location. Like web search,
   it needs the Network permission on GrapheneOS.
 - **Reminders** are Shuttle's own notifications (asked for on Android 13+), on time even if
