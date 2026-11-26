@@ -156,6 +156,11 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   "I don't have real-time information" or "want me to search?" is replaced by a search and a
   fresh answer. "Search it" or "look it up" searches the question asked before. Only the search words are sent. Before
   the model is downloaded, a search shows the results themselves.
+- **Follow-ups to a command.** "Turn it off", "switch it back on", "it's still on", "that
+  didn't work" and "try again" act on the last phone command (`engine/FollowUps.kt`): "it's
+  still on" after "flashlight off" turns it off again. They're handled before the parser and
+  never by the model, which could otherwise just say it had done it; the model is also told
+  never to claim a change it didn't make with a tool.
 - **Follow-ups versus commands.** Right after the model has answered, a few words that are
   otherwise phone commands ("continue", "next", "go back", "again") go to the model instead, so
   "continue" after a long answer carries on with it rather than starting the music; small talk
@@ -329,6 +334,7 @@ timers are created in your own clock app, which rings them.
 | `tools/Music.kt` | Playing music by name |
 | `tools/CallHistory.kt` | Missed and recent calls; calling back |
 | `tools/MemoryTools.kt` | Remembered facts and routines, kept on the phone |
+| `engine/FollowUps.kt` | "Turn it off", "it's still on", "try again": acting on the last command |
 | `engine/Memory.kt` | Facts for the model; "my wife" → a name |
 | `engine/Routines.kt` | Matching a routine's phrase; its lines as commands |
 | `search/PageText.kt` | The readable text of a shared link's page |

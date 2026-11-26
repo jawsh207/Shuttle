@@ -12,6 +12,8 @@ import androidx.lifecycle.ViewModel
 import app.shuttle.assistant.chats.ChatStore
 import app.shuttle.assistant.engine.CONFIRMED
 import app.shuttle.assistant.engine.CommandParser
+import app.shuttle.assistant.engine.CONFIRMED
+import app.shuttle.assistant.engine.FollowUps
 import app.shuttle.assistant.engine.InstantAnswers
 import app.shuttle.assistant.engine.Memory
 import app.shuttle.assistant.engine.Routines
@@ -78,6 +80,8 @@ class AssistantViewModel : ViewModel() {
          * this session, not saved with the chat.
          */
         val fullText: String? = null,
+        /** The phone command that gave this result, for follow-ups like "turn it off" (this session only). */
+        val call: ToolCall? = null,
     )
 
     /** True while the model is writing; new requests wait (or the user stops it). */
@@ -190,6 +194,16 @@ class AssistantViewModel : ViewModel() {
                 }
                 after(close)
             }
+        }
+        // "Turn it off", "it's still on", "try again": the last phone command, done properly.
+        // Answered here, never by the model, which might only say it had done it.
+        val recent = exchanges.takeLast(4)
+        val lastCall = recent.lastOrNull { it.call != null }?.call
+        val lastIsCommand = exchanges.lastOrNull()?.call != null
+        FollowUps.resolve(asked, lastCall)?.let { call ->
+            // A bare "again"/"try again" after a model answer is about that answer instead.
+            val retryOnly = call.args == (lastCall!!.args - CONFIRMED)
+            if (!retryOnly || lastIsCommand) return runCalls(context, listOf(call), asked, after)
         }
         val model = ModelManager.ready
         // Mid-conversation with the model, a follow-up like "continue" or "next" means "go on
@@ -551,7 +565,7 @@ class AssistantViewModel : ViewModel() {
             }
             val askedHere = if (i == 0) firstAsked else ""
             if (QuickTiles.handles(call)) {
-                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = "Tapping Quick Settings…")
+                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = "Tapping Quick Settings…", call = call)
                 exchanges += placeholder
                 QuickTiles.run(context, call) { result ->
                     replace(placeholder.id) { it.copy(result = result, thinking = false) }
@@ -559,7 +573,7 @@ class AssistantViewModel : ViewModel() {
                 }
             } else if (call.name in DeviceTools.async) {
                 // Tools that wait on the network (the weather): same card-then-fill.
-                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = DeviceTools.asyncStatus(call))
+                val placeholder = Exchange(nextId++, askedHere, ToolResult.Done(""), thinking = true, status = DeviceTools.asyncStatus(call), call = call)
                 exchanges += placeholder
                 DeviceTools.async.getValue(call.name)(context, call) { result ->
                     replace(placeholder.id) { it.copy(result = result, thinking = false) }
@@ -568,7 +582,7 @@ class AssistantViewModel : ViewModel() {
                 }
             } else {
                 val result = DeviceTools.run(context, call)
-                exchanges += Exchange(nextId++, askedHere, result)
+                exchanges += Exchange(nextId++, askedHere, result, call = call)
                 if ((result as? ToolResult.Done)?.closePanel == true) close = true
                 step(i + 1)
             }
