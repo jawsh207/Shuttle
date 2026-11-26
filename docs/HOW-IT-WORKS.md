@@ -195,10 +195,15 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   text), newest first, optionally only from an app or person. Replies use the message's own
   Reply button, so the app it came from sends it, after a confirmation card. With nothing to
   reply to, "reply to Sam…" sends a text instead.
-- **Weather** (`engine/Weather.kt`, `tools/WeatherTool.kt`): Open-Meteo's free, keyless
-  forecast and place search. Without a named place it uses the phone's approximate location
-  from Android's location service, rounded to about a kilometre before it's sent. Units follow
-  the region. Like web search, it runs in the background with a card that fills in.
+- **Weather** (`engine/Weather.kt`, `tools/WeatherTool.kt`): the US National Weather Service
+  for places in the US (falling back to MET Norway if it doesn't answer), MET Norway
+  everywhere else. Both are free for any use and keyless, and want a User-Agent naming the
+  app; the answer credits the source. A named place is found on the phone in the GeoNames
+  place list (`engine/Places.kt`, `assets/places/`): a region after the name narrows it, and
+  otherwise the biggest match wins with a strong lean toward the user's own country.
+  Without a place, the phone's approximate location is used, rounded to about a kilometre.
+  Only coordinates are sent. Units follow the region. It runs in the background with a card
+  that fills in.
 - **Settings shortcuts, camera, contacts, email, notes** (`tools/Shortcuts.kt`): settings
   pages by name (`engine/SettingsPages.kt`) and any app's App info; the camera for a photo,
   selfie or video; a contact's number, email, address or birthday; an email started in the
@@ -300,7 +305,10 @@ timers are created in your own clock app, which rings them.
 | `tools/Shortcuts.kt` | Settings pages, App info, camera, contact details, email, notes |
 | `engine/When.kt` | Days and times as said, for reminders and events |
 | `engine/InstantAnswers.kt` | Arithmetic, unit conversions, time elsewhere |
-| `engine/Weather.kt` | Open-Meteo requests and the weather report |
+| `engine/Weather.kt` | National Weather Service and MET Norway answers; the weather report |
+| `engine/Places.kt` | Finding a named place in the offline place list |
+| `app/src/main/assets/places/` | The place list: towns of 5,000+ people from GeoNames, with region, country, coordinates and time zone |
+| `tools/places/make_places.py`, `.github/workflows/places.yml` | Build the place list from GeoNames and commit it (Actions › Update place list) |
 | `engine/Json.kt` | A small JSON reader (testable without Android) |
 | `engine/SettingsPages.kt` | Settings pages by name |
 | `engine/QuickTileNames.kt` | Tile labels for each switch, name matching, reading on/off |

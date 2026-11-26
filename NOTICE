@@ -19,3 +19,11 @@ Licensed under the MIT License; see app/src/main/cpp/llama.cpp/LICENSE.
 The language model (IBM Granite 4.2 3B, GGUF) is not part of this repository or the app. It is
 downloaded on request from https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF and is
 licensed by IBM under the Apache License, Version 2.0.
+
+Place names (app/src/main/assets/places/) come from GeoNames (https://www.geonames.org),
+licensed under the Creative Commons Attribution 4.0 License.
+
+Weather forecasts are fetched when asked from MET Norway (https://api.met.no), whose data is
+licensed under the Norwegian Licence for Open Government Data and Creative Commons
+Attribution 4.0, and from the US National Weather Service (https://www.weather.gov), whose
+data is in the public domain. Each answer names its source.
