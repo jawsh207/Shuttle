@@ -54,6 +54,42 @@ object SearchHints {
         return a.length < 500 && deferrals.any { it in a }
     }
 
+    /** Strong signs of "I can't know that", safe to act on before the answer is finished. */
+    private val earlyDeferrals = listOf(
+        "real-time", "real time", "up-to-date information", "up to date information", "current information",
+        "latest information", "current data", "live data", "knowledge cutoff", "knowledge cut-off", "as of my last",
+        "my last update", "my training data", "don't have access to the internet", "do not have access to the internet",
+        "can't browse", "cannot browse", "unable to browse", "can't access the internet", "cannot access the internet",
+        "don't have current", "do not have current", "beyond my knowledge", "don't have the ability to browse",
+    )
+    private val apology = Regex(
+        "^(?:i'm sorry|i am sorry|sorry|i apologi[sz]e|unfortunately|as of)[^.!?]{0,90}?" +
+            "(?:don't have|do not have|can't|cannot|unable|not able|no access|last update|knowledge|aware of)",
+    )
+
+    /**
+     * Whether an answer that's still being written is turning out to be a deferral, judged on
+     * its first few hundred characters only. Stricter than [isDeferral]: advice like "check
+     * with your doctor" early in a real answer doesn't count.
+     */
+    fun isDeferralStart(partial: String): Boolean {
+        val a = partial.take(400).lowercase().replace('’', '\'').trim()
+        if (a.isEmpty()) return false
+        return offers.any { it in a } || earlyDeferrals.any { it in a } || apology.containsMatchIn(a)
+    }
+
+    /**
+     * Whether enough of an answer has been written to start showing it: a whole first sentence
+     * (or line), or a good stretch without one. Until then it might still turn out to be a
+     * deferral, which is replaced by a search without ever showing.
+     */
+    fun showable(partial: String): Boolean {
+        val t = partial.trim()
+        if (t.length >= 220) return true
+        if (t.length < 30) return false
+        return Regex("[.!?:](\\s|$)|\n").containsMatchIn(t.substring(25))
+    }
+
     /** "search it", "look that up": a search for the question before, not for the word "it". */
     fun refersBack(query: String): Boolean =
         query.trim().lowercase().removeSuffix("?").removeSuffix(".").trim() in

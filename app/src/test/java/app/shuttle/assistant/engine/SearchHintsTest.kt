@@ -28,6 +28,18 @@ class SearchHintsTest {
         assertFalse(SearchHints.isDeferral("Mix 500 g flour, 325 ml warm water, 7 g yeast and 10 g salt. ".repeat(10) + "For the latest tips, check a baking site."))
     }
 
+    @Test fun deferralsWhileWriting() {
+        assertTrue(SearchHints.isDeferralStart("I'm sorry, but I don't have"))
+        assertTrue(SearchHints.isDeferralStart("As of my last"))
+        assertTrue(SearchHints.isDeferralStart("I don't have real-time"))
+        assertTrue(SearchHints.isDeferralStart("Unfortunately, I can't"))
+        assertFalse(SearchHints.isDeferralStart("Rome is the capital of Italy. Please check the museum hours before you go."))
+        assertFalse(SearchHints.isDeferralStart("Mix the flour and water"))
+        assertFalse(SearchHints.showable("The sky looks"))
+        assertTrue(SearchHints.showable("The sky looks blue because air scatters blue light. "))
+        assertTrue(SearchHints.showable("x".repeat(230)))
+    }
+
     @Test fun searchingBack() {
         assertTrue(SearchHints.refersBack("it"))
         assertTrue(SearchHints.refersBack("that up"))

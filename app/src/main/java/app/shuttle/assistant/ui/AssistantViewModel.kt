@@ -384,10 +384,20 @@ class AssistantViewModel : ViewModel() {
         after: (Boolean) -> Unit,
     ) {
         val prompt = GranitePrompt.build(ModelPrompts.system(), ModelPrompts.tools, messages, note = ModelPrompts.note(memory = Memory.forModel(MemoryStore.facts(context))))
-        LocalModel.generate(model.file, prompt) { event ->
+        // Before searching, an answer stays hidden until its first sentence is written: one that
+        // turns out to be "I don't have real-time information…" is stopped there and replaced by
+        // a search, without ever showing.
+        val mayDefer = round == 0
+        var showing = !mayDefer
+        val stopForSearch = { raw: String -> mayDefer && !showing && SearchHints.isDeferralStart(GranitePrompt.visibleText(raw)) }
+        LocalModel.generate(model.file, prompt, shouldStop = stopForSearch) { event ->
             when (event) {
                 is LocalModel.Event.Status -> replace(placeholderId) { it.copy(status = if (round > 0) "Reading the results…" else event.text) }
-                is LocalModel.Event.Text -> replace(placeholderId) { it.copy(result = ToolResult.Done(GranitePrompt.visibleText(event.raw), sources = sources)) }
+                is LocalModel.Event.Text -> {
+                    val visible = GranitePrompt.visibleText(event.raw)
+                    if (!showing && SearchHints.showable(visible) && !SearchHints.isDeferralStart(visible)) showing = true
+                    if (showing) replace(placeholderId) { it.copy(result = ToolResult.Done(visible, sources = sources)) }
+                }
                 is LocalModel.Event.Failed -> {
                     replace(placeholderId) { it.copy(result = ToolResult.Failed(event.message), thinking = false) }
                     thinking = false
@@ -404,7 +414,7 @@ class AssistantViewModel : ViewModel() {
                     }
                     // "I don't have real-time information" or "want me to search?": search now and
                     // answer again, instead of making the user ask twice.
-                    if (round == 0 && !stopped && calls.isEmpty() && SearchHints.isDeferral(text)) {
+                    if (round == 0 && !stopped && calls.isEmpty() && (SearchHints.isDeferral(text) || (!showing && SearchHints.isDeferralStart(text)))) {
                         val query = SearchHints.queryFor(asked)
                         return@generate searchThenAnswer(context, model, messages, placeholderId, query, searchCall(query), after)
                     }

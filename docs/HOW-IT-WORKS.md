@@ -154,7 +154,9 @@ whatever the fast path doesn't: questions, conversation, unusual wordings, follo
   (`engine/SearchHints.kt`): a question plainly about now (news, scores, prices, who holds an
   office, new releases, a recent year) is searched first, and an answer that turns out to be
   "I don't have real-time information" or "want me to search?" is replaced by a search and a
-  fresh answer. "Search it" or "look it up" searches the question asked before. Only the search words are sent. Before
+  fresh answer. To keep that from showing, an answer stays hidden (the card shows the model
+  thinking) until its first sentence is written; one that starts as a deferral is stopped
+  right there and the search runs instead. "Search it" or "look it up" searches the question asked before. Only the search words are sent. Before
   the model is downloaded, a search shows the results themselves.
 - **Follow-ups to a command.** "Turn it off", "switch it back on", "it's still on", "that
   didn't work" and "try again" act on the last phone command (`engine/FollowUps.kt`): "it's
