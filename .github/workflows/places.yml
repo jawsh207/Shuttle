@@ -1,0 +1,36 @@
+# Refreshes the offline place list (app/src/main/assets/places/) from GeoNames: runs when this
+# file or the script changes, or from Actions › Update place list. Commits the result to main.
+name: Update place list
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/places.yml
+      - tools/places/make_places.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  places:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download GeoNames
+        run: |
+          set -e
+          mkdir -p /tmp/geonames && cd /tmp/geonames
+          curl -sSfLO https://download.geonames.org/export/dump/cities5000.zip
+          curl -sSfLO https://download.geonames.org/export/dump/admin1CodesASCII.txt
+          curl -sSfLO https://download.geonames.org/export/dump/countryInfo.txt
+          unzip -o cities5000.zip
+      - name: Build the place list
+        run: python3 tools/places/make_places.py /tmp/geonames/cities5000.txt /tmp/geonames/admin1CodesASCII.txt /tmp/geonames/countryInfo.txt
+      - name: Commit if changed
+        run: |
+          git add app/src/main/assets/places
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git -c user.name=jawsh207 -c user.email=76641448+jawsh207@users.noreply.github.com commit -m "Update the offline place list from GeoNames"
+          git push
